@@ -1,0 +1,114 @@
+opportunity_source: dm77_catalog
+run:
+  seed: 42
+  sample_size: 20000
+  device: cpu
+  output_root: artifacts/prometheus_dm77_integrated
+data:
+  source: fully_synthetic
+  cohort_cache: null
+  synthetic:
+    generator: structured_longitudinal_population_v1
+    population_profile: methodological_adult_population_v1
+    scenario: baseline
+    seed_offset: 100000
+    reference_date: 2025-01-01
+    history_months: 24
+    minimum_age: 18
+    maximum_age: 100
+    write_monthly_history: true
+dm77:
+  enabled: true
+  config_path: configs/dm77/default.yaml
+  use_level_as_ranker_feature: false
+  use_level_as_treatment: false
+care:
+  catalog: configs/dm77/care_action_catalog.yaml
+  current_state_seed_offset: 31337
+simulation:
+  scenario: baseline_identifiable
+  outcome_noise_sd: 6.0
+  action_dgp_seed_offset: 70001
+  minimum_action_assignments_per_split: 12
+causal_signal:
+  estimator: dr
+  aggregation: median
+  winsorize: true
+  winsorize_quantiles: [0.01, 0.99]
+  reliability_weighting: true
+  min_direction_agreement: 0.80
+nuisance:
+  folds: 5
+  repeats: 5
+  repeat_seed_stride: 1009
+  model: gbm
+prometheus:
+  training_mode: unified_global_ranker
+  within_pairs_per_epoch: 15000
+  cross_pairs_per_epoch: 15000
+  beta_cross: 0.50
+  validation_beta_cross: 0.50
+  min_signal_gap_days: 2.0
+  min_pair_direction_agreement: 0.80
+  balance_transition_pairs: true
+  allow_same_patient_cross_pairs: false
+  contrastive_pairs_per_epoch: 0
+  lambda_con: 0.0
+  lambda_reg: 0.000001
+  contrastive_margin: 1.0
+  positive_max_gap_days: 3.0
+  negative_min_gap_days: 15.0
+  propensity_clip_epsilon: 0.02
+  dr_signal_aggregation: median
+  pair_reliability_weighting: {enabled: true, max_weight: 25.0}
+  calibration: {method: isotonic, pooled_for_global_models: true}
+  epochs: 20
+  batch_size: 512
+  hidden_dim: 128
+  latent_dim: 32
+  learning_rate: 0.0003
+  patience: 4
+checkpoint:
+  metric: global_concordance
+  validation_policy_fraction: 0.20
+calibration:
+  selected_method: reliability_weighted_pooled_isotonic
+  methods: [pooled_isotonic, reliability_weighted_pooled_isotonic, monotonic_binned, action_mean_shrinkage]
+  minimum_bin_size: 50
+  shrinkage_pooled_weight: 0.70
+baselines:
+  enabled: [random_priority, risk_priority, action_mean_priority, dm77_need_fixed_action_rule, historical_action_propensity, cost_normalized_risk_priority, independent_action_rankers, unified_local_ranker, unified_global_ranker, direct_pairwise_gbdt_ranker, pooled_dr_gbdt, independent_dr_gbdt, dr_random_forest_priority, dr_policy_tree, oracle_priority]
+  settings:
+    direct_pairwise_gbdt_ranker: {within_pairs: 15000, cross_pairs: 15000, anchor_count: 256, max_iter: 120}
+    pooled_dr_gbdt: {max_iter: 120}
+    independent_dr_gbdt: {max_iter: 120}
+    dr_random_forest_priority: {estimators: 240, min_samples_leaf: 20}
+    dr_policy_tree: {max_depth: 3, min_samples_leaf: 50, thresholds_per_feature: 7}
+evaluation:
+  top_quantiles: [0.05, 0.10, 0.20]
+  calibration_score_groups: 10
+  interval_targets: [policy_value, value_difference, group_average_effect, benefit_at_budget]
+  individual_effect_interval_coverage: false
+  rate_bootstrap_samples: 500
+  ope_policy_fraction: 0.20
+  budget_fractions: [0.10, 0.25, 0.50, 0.75, 1.00]
+contrastive:
+  enabled: false
+  pair_scope: within_action
+  require_stable_direction: true
+  require_overlap_support: true
+allocation:
+  value_mode: calibrated_benefit
+  shared_budget: 2500.0
+  max_primary_actions_per_patient: 1
+  capacity_pools:
+    followup_capacity: 1000
+    chronic_management_capacity: 900
+    case_management_capacity: 700
+    remote_monitoring_capacity: 500
+    multidisciplinary_capacity: 500
+    home_support_capacity: 350
+  require_empirical_support: true
+  propensity_support: {lower: 0.05, upper: 0.95}
+  allocate_negative_predicted_benefit: false
+  solver_time_limit_seconds: 120.0

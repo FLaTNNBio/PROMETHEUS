@@ -1,0 +1,17 @@
+base_config: configs/prometheus/dm77_integrated_contrastive_v2_default.yaml
+
+# The two seed groups match the completed full-scale contrastive-v2 suite.
+# Discovery is evaluated first; confirmation remains untouched unless the
+# validation-only DR policy checkpoint improves the prespecified primary metric.
+default_seeds: [131, 163, 191, 227, 251]
+
+suites:
+  dm77_dr_policy_checkpoint_discovery:
+    seed: [131, 163, 191, 227, 251]
+    dgp_scenario: [baseline_identifiable]
+    checkpoint_metric: [dr_policy_value]
+
+  dm77_dr_policy_checkpoint_confirmation:
+    seed: [149, 179, 211, 239, 269]
+    dgp_scenario: [baseline_identifiable]
+    checkpoint_metric: [dr_policy_value]

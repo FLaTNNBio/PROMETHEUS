@@ -1,0 +1,155 @@
+catalog_version: dm77_computable_care_actions_v1
+
+care_states:
+  - state_id: routine_primary_care
+    active_services: [routine_primary_care]
+  - state_id: structured_followup
+    active_services: [routine_primary_care, structured_followup]
+  - state_id: chronic_disease_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management]
+  - state_id: proactive_case_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management]
+  - state_id: remote_multidisciplinary_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management, remote_multidisciplinary_management]
+  - state_id: high_intensity_home_support
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management, remote_multidisciplinary_management, high_intensity_home_support]
+  - state_id: protected_palliative_care
+    active_services: [protected_palliative_care]
+
+actions:
+  - action_id: add_structured_followup
+    from_states: [routine_primary_care]
+    to_state: structured_followup
+    eligible_dm77_levels: [II, III]
+    clinical_rules: {min_condition_distinct: 0}
+    contraindications: [palliative_need]
+    prerequisites: [routine_primary_care]
+    mutually_exclusive_with: [start_chronic_disease_management]
+    capacity_pool: followup_capacity
+    cost: 1.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 3.0
+    synthetic_effect_scale_days: 4.0
+
+  - action_id: start_chronic_disease_management
+    from_states: [routine_primary_care, structured_followup]
+    to_state: chronic_disease_management
+    eligible_dm77_levels: [II, III, IV]
+    clinical_rules: {min_condition_distinct: 1}
+    contraindications: [palliative_need]
+    prerequisites: [routine_primary_care]
+    mutually_exclusive_with: [add_structured_followup, add_proactive_case_management]
+    capacity_pool: chronic_management_capacity
+    cost: 1.5
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.5
+    synthetic_effect_scale_days: 5.5
+
+  - action_id: add_proactive_case_management
+    from_states: [structured_followup, chronic_disease_management]
+    to_state: proactive_case_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2}
+    contraindications: [palliative_need]
+    prerequisites: [structured_followup]
+    mutually_exclusive_with: [start_chronic_disease_management, add_remote_monitoring, add_multidisciplinary_coordination]
+    capacity_pool: case_management_capacity
+    cost: 2.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 5.0
+    synthetic_effect_scale_days: 6.0
+
+  - action_id: add_remote_monitoring
+    from_states: [chronic_disease_management, proactive_case_management]
+    to_state: remote_multidisciplinary_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2, max_social_fragility_score: 0.85}
+    contraindications: [palliative_need, housing_instability]
+    prerequisites: [chronic_disease_management]
+    mutually_exclusive_with: [add_proactive_case_management, add_multidisciplinary_coordination, add_high_intensity_home_support]
+    capacity_pool: remote_monitoring_capacity
+    cost: 2.5
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.0
+    synthetic_effect_scale_days: 6.5
+
+  - action_id: add_multidisciplinary_coordination
+    from_states: [chronic_disease_management, proactive_case_management]
+    to_state: remote_multidisciplinary_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2}
+    contraindications: [palliative_need]
+    prerequisites: [chronic_disease_management]
+    mutually_exclusive_with: [add_proactive_case_management, add_remote_monitoring, add_high_intensity_home_support]
+    capacity_pool: multidisciplinary_capacity
+    cost: 2.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 5.5
+    synthetic_effect_scale_days: 6.5
+
+  - action_id: add_high_intensity_home_support
+    from_states: [proactive_case_management, remote_multidisciplinary_management]
+    to_state: high_intensity_home_support
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_functional_limitation_score: 0.25}
+    contraindications: [palliative_need]
+    prerequisites: [proactive_case_management]
+    mutually_exclusive_with: [add_remote_monitoring, add_multidisciplinary_coordination]
+    capacity_pool: home_support_capacity
+    cost: 4.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.0
+    synthetic_effect_scale_days: 7.0
+
+  - action_id: protected_palliative_pathway
+    from_states:
+      - routine_primary_care
+      - structured_followup
+      - chronic_disease_management
+      - proactive_case_management
+      - remote_multidisciplinary_management
+      - high_intensity_home_support
+    to_state: protected_palliative_care
+    eligible_dm77_levels: [VI]
+    clinical_rules: {requires_palliative_need: true}
+    contraindications: []
+    prerequisites: []
+    mutually_exclusive_with: []
+    capacity_pool: protected_palliative_capacity
+    cost: 0.0
+    mandatory: true
+    protected: true
+    outcome_name: goal_concordant_palliative_care_days
+    followup_horizon: 90
+    outcome_direction: higher_is_better
+    outcome_unit: days

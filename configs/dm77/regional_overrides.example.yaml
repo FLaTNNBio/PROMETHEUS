@@ -1,0 +1,6 @@
+# Example only. Threshold changes require documented local clinical, social-care,
+# legal, and data-governance approval. These values are not official DM 77 cut-offs.
+threshold_profile: example_regional_profile_not_validated
+thresholds:
+  clinical_high: 0.65
+  social_fragility: 0.40

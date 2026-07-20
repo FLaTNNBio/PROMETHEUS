@@ -1,0 +1,31 @@
+run: {seed: 42, scenario: baseline, sample_size: 12000, output_root: artifacts/prometheus_runs/unified_covariate_contrastive, device: cpu}
+data: {cohort_cache: data/processed/causal_population.csv}
+simulation:
+  shared_effect_correlation: 0.5
+  overlap_strength: 1.5
+  risk_benefit_alignment: 0.0
+  transition_imbalance_rho: 1.0
+  capacities: {1_to_2: 0.40, 2_to_3: 0.30, 3_to_4: 0.20, 4_to_5: 0.10, 5_to_6: 0.05}
+nuisance: {folds: 3, model: gradient_boosting, repeats: 5, repeat_seed_stride: 1009}
+prometheus:
+  training_mode: unified_covariate_contrastive
+  lambda_con: 0.1
+  lambda_reg: 0.000001
+  contrastive_margin: 1.0
+  num_response_bins: 5
+  negative_bin_separation: 2
+  ranking_min_signal_gap: 0.0
+  propensity_clip_epsilon: 0.02
+  pairs_per_transition: 6000
+  contrastive_pairs_per_transition: 3000
+  positive_negative_pair_ratio: 1.0
+  normalize_contrastive_embeddings: false
+  pair_reliability_weighting: {enabled: false, max_weight: 1.0}
+  dr_signal_aggregation: median
+  min_pair_direction_agreement: 0.8
+  epochs: 8
+  batch_size: 512
+  hidden_dim: 128
+  latent_dim: 32
+  learning_rate: 0.0003
+  patience: 4
