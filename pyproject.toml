@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "causal-population-ranking"
-version = "0.2.0"
-description = "Direct global multi-transition causal prioritization from longitudinal population data"
+version = "0.3.0"
+description = "Direct causal ranking of patient-care-profile opportunities"
 requires-python = ">=3.10"
 dependencies = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "PyYAML"]
 

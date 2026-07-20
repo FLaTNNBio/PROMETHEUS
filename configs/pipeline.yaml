@@ -1,0 +1,847 @@
+config_version: prometheus_care_profile_pipeline_v1
+decision_unit: care_profile
+opportunity_source: care_profile_catalog
+
+run:
+  run_id: auto
+  output_root: artifacts/prometheus_pipeline
+  population_size: 1800
+  history_months: 24
+  population_seed: 2101
+  reference_seed: 2111
+  need_model_seed: 2129
+  need_split_seed: 2141
+  current_care_seed: 2153
+  effect_seed: 2161
+  assignment_seed: 2179
+  outcome_seed: 2203
+  split_seed: 2213
+  nuisance_seed: 2237
+  ranker_model_seed: 2267
+  ranker_pair_seed: 2273
+  ranker_validation_pair_seed: 2281
+  ranker_contrastive_seed: 2287
+  ranker_gbdt_seed: 2293
+  ranker_random_seed: 2297
+  allocator_tie_seed: 2309
+
+synthetic_population:
+  profile: methodological_adult_population_v1
+  scenario: baseline
+  reference_date: "2025-01-01"
+
+baseline_need:
+  mode: rules
+  contract:
+    contract_version: prometheus_baseline_need_stratifier_v1
+    status: synthetic_research_operationalization_not_official_dm77
+    levels: [1, 2, 3, 4, 5, 6]
+    default_mode_for_initial_profile_experiments: rules
+
+    output_fields:
+      - baseline_need_level
+      - baseline_need_score
+      - baseline_need_probabilities
+      - baseline_need_explanation
+      - baseline_need_mode
+      - baseline_need_status
+      - baseline_need_model_version
+
+    allowed_preindex_features:
+      - age
+      - condition_distinct
+      - prior_inpatient
+      - prior_emergency
+      - medication_distinct
+      - frailty_index
+      - functional_limitation_score
+      - social_fragility_score
+      - cognitive_impairment
+      - non_self_sufficiency
+      - caregiver_available
+      - housing_instability
+      - palliative_need
+
+    forbidden_exact_fields:
+      - observed_outcome
+      - outcome
+      - observed_treatment_profile
+      - recommended_profile_id
+      - recommended_actionable_level
+      - allocated_profile_id
+      - allocated_care_level
+      - raw_priority_score
+      - calibrated_incremental_benefit
+      - dr_pseudo_outcome
+      - future_resource_use
+
+    forbidden_prefixes:
+      - true_
+      - oracle_
+      - potential_outcome
+      - latent_
+      - postindex_
+      - future_
+
+    modes:
+      rules:
+        implementation: dm77_transparent_rules_v1
+        settings:
+          assessment_version: dm77_research_operationalization_v1
+          threshold_profile: research_default_not_official
+          missing_data_policy: manual_review
+          required_fields:
+            - age
+            - condition_distinct
+            - prior_inpatient
+            - prior_emergency
+            - medication_distinct
+            - frailty_index
+            - functional_limitation_score
+            - social_fragility_score
+            - cognitive_impairment
+            - non_self_sufficiency
+            - caregiver_available
+            - housing_instability
+            - palliative_need
+          exclude_level_vi_from_standard_allocation: true
+          exclude_manual_review_from_standard_allocation: true
+          thresholds:
+            clinical_high: 0.60
+            functional_moderate: 0.35
+            functional_high: 0.75
+            social_fragility: 0.45
+            frailty_moderate: 0.25
+            frailty_high: 0.70
+            chronicity_min_conditions: 2
+            high_condition_count: 5
+            high_prior_inpatient: 2
+        threshold_status: research_default_not_official
+        probability_semantics: deterministic_one_hot_not_learned_uncertainty
+        missing_data_policy: manual_review
+        explanation_source: rule_and_dimension_reason_codes
+
+      supervised:
+        implementation: cumulative_binary_ordinal_logistic_v1
+        reference_label: clinician_assigned_need_level
+        reference_label_provenance_required: true
+        reference_provenance_field: need_reference_source
+        thresholds: [1, 2, 3, 4, 5]
+        probability_construction: monotone_cumulative_probabilities
+        cross_fitting_folds: 5
+        model_seed: required_from_run_configuration
+        split_seed: required_from_run_configuration
+        minimum_training_rows_per_level: 30
+        missing_reference_labels: exclude_from_training_and_report
+        missing_predictors: manual_review
+        calibration_partition: validation
+        capacity_inputs_allowed: false
+        causal_ranking_inputs_allowed: false
+
+    synthetic_label_contract:
+      evaluation_only_truth_field: true_baseline_need_level
+      learner_reference_field: clinician_assigned_need_level
+      learner_may_read_truth_field: false
+      label_generator: seeded_noisy_panel_proxy_v1
+      exact_rule_inversion_forbidden: true
+      oracle_score_physically_separate: true
+
+care:
+  profile_catalog: configs/care_catalog.yaml
+
+causal_supervision:
+  model: linear
+  folds: 3
+  repeats: 5
+  repeat_seed_stride: 101
+  split_fractions:
+    nuisance_train: 0.30
+    rank_train: 0.45
+    validation: 0.125
+    test: 0.125
+  propensity_clip: [0.03, 0.97]
+  overlap_support_bounds: [0.05, 0.95]
+  minimum_arm_count_per_split: 2
+  minimum_effective_sample_size_per_split: 4.0
+  minimum_profile_effective_sample_size: 30.0
+  minimum_overlap_fraction_per_split: 0.50
+  aggregation: median
+  winsorize: true
+  winsorize_quantiles: [0.01, 0.99]
+  numeric_features:
+    - age
+    - female
+    - deprivation_index
+    - rurality
+    - health_literacy_score
+    - smoking
+    - bmi
+    - diabetes
+    - cardiovascular_disease
+    - copd
+    - chronic_kidney_disease
+    - cancer_history
+    - mental_health_condition
+    - chronic_pain
+    - condition_distinct
+    - prior_inpatient
+    - prior_emergency
+    - medication_distinct
+    - recent_utilization_trend
+    - multimorbidity
+    - polypharmacy
+    - encounter_count
+    - days_since_encounter
+    - procedure_count
+    - careplan_count
+    - frailty_index
+    - functional_limitation_score
+    - social_fragility_score
+    - cognitive_impairment
+    - non_self_sufficiency
+    - caregiver_available
+    - housing_instability
+    - palliative_need
+    - baseline_need_level
+    - baseline_need_score
+    - current_care_profile_level
+  categorical_features: [current_care_profile]
+
+ranker:
+  primary_variant: global_rank_only
+  variants:
+    - independent_profile_rankers
+    - global_rank_only
+    - global_rank_plus_contrastive
+    - direct_pairwise_gbdt
+    - risk_based_ranking
+    - baseline_need_based_ranking
+    - random
+  evaluation_only_variants: [oracle_evaluation_only]
+  hidden_dim: 24
+  profile_embedding_dim: 8
+  projection_dim: 8
+  model_restarts: 3
+  restart_aggregation: mean_percentile_rank
+  epochs: 32
+  patience: 8
+  minimum_improvement: 0.000001
+  learning_rate: 0.0015
+  weight_decay: 0.001
+  training_pairs: 4096
+  validation_pairs: 2048
+  within_profile_fraction: 0.50
+  minimum_signal_gap: 0.05
+  minimum_direction_agreement: 0.75
+  maximum_pair_weight: 5.0
+  allow_cross_profile_training_pairs: true
+  allow_same_patient_cross_profile_pairs: false
+  contrastive_pairs: 2048
+  contrastive_response_bins: 4
+  contrastive_weight: 0.10
+  contrastive_margin: 1.0
+  gbdt_max_iter: 24
+  gbdt_max_depth: 3
+  gbdt_learning_rate: 0.05
+  gbdt_reference_rows: 48
+
+recommendation:
+  minimum_validation_rows: 30
+  monotonic_bins: 8
+  profile_mean_shrinkage_strength: 20.0
+  uncertainty_residual_quantile: 0.90
+  minimum_profile_validation_rows: 20
+  profile_evidence_one_sided_z: 2.576
+  profile_evidence_null_days: 0.0
+
+allocation:
+  method: cardinal_milp_over_frozen_recommendations_v1
+  shared_budget_units_per_patient: 0.75
+  tie_break_epsilon: 0.000000001
+  budget_curve_multipliers: [0.25, 0.50, 0.75, 1.00, 1.25]
+  fixed_capacity_fractions: [0.05, 0.10, 0.20]
+  solver:
+    presolve: true
+    mip_relative_gap: 0.0
+    time_limit_seconds: 15.0
+
+diagnostics:
+  campaign_version: prometheus_nonoracle_diagnostics_v1
+  status: prespecified_before_discovery
+  evaluation_partition: test
+  evaluation_partition_used_for_fitting_or_early_stopping: false
+  eligible_for_model_selection: false
+  base_seeds: [1201, 1223, 1249, 1277, 1301]
+  component_seed_derivation: numpy_seed_sequence_uint32_v1
+  heldout_test_pairs: 256
+  ranker_variants: [global_rank_only, global_rank_plus_contrastive]
+  scenario_conditions:
+    baseline_identifiable:
+      - standard
+      - within_profile_training_only
+      - permuted_training_pair_labels
+    no_shared_response:
+      - standard
+      - within_profile_training_only
+    sharp_null: [standard]
+    placebo_outcome: [standard]
+  supervised_need_ablation:
+    base_seed: 1201
+    population_size: 5000
+    reference: synthetic_noisy_need_panel_v1_nonoracle
+  threshold_sensitivity_days: [0.0, 2.0, 5.0]
+  controls:
+    null_max_median_concordance_distance_from_chance: 0.15
+    null_max_recommendation_rate: 0.10
+    permuted_max_median_concordance: 0.60
+    minimum_unpermuted_minus_permuted_concordance: 0.00
+  failure_policy: stop_before_large_experiments_and_version_diagnostic_protocol
+
+experiments:
+  protocol_version: prometheus_ranker_stabilization_v7
+  status: global_rank_only_locked_after_v7_discovery_before_confirmation
+  scenario: baseline_identifiable
+  population_size: 5000
+  candidate_variants: [global_rank_only, global_rank_plus_contrastive]
+  component_seed_derivation: numpy_seed_sequence_namespaced_uint32_v1
+  stability_diagnostics:
+    registry_group: stability_diagnostics_v7
+    dataset_seed: 6073
+    reference_run_seed: 3503
+    perturbation_run_seeds: [3517, 3533, 3557]
+    sources:
+      model_initialization: [ranker_model_seed]
+      pair_sampling: [ranker_pair_seed, ranker_validation_pair_seed, ranker_contrastive_seed]
+      nuisance_fitting: [nuisance_seed]
+      split_and_nuisance: [split_seed, nuisance_seed]
+    score_variant: global_rank_only
+    fractions: [0.10, 0.20]
+    baseline_ranker_settings:
+      model_restarts: 1
+      epochs: 4
+      patience: 2
+      learning_rate: 0.003
+      weight_decay: 0.0001
+      training_pairs: 384
+      validation_pairs: 384
+      contrastive_pairs: 256
+    baseline_causal_supervision_settings:
+      repeats: 2
+      split_fractions:
+        nuisance_train: 0.40
+        rank_train: 0.30
+        validation: 0.15
+        test: 0.15
+    stabilized_ranker_settings:
+      model_restarts: 3
+      epochs: 32
+      patience: 8
+      learning_rate: 0.0015
+      weight_decay: 0.001
+      training_pairs: 4096
+      validation_pairs: 2048
+      contrastive_pairs: 2048
+    stabilized_causal_supervision_settings:
+      repeats: 5
+      split_fractions:
+        nuisance_train: 0.30
+        rank_train: 0.45
+        validation: 0.125
+        test: 0.125
+    acceptance:
+      minimum_stabilized_mean_score_spearman: 0.65
+      minimum_stabilized_mean_top_10pct_jaccard: 0.30
+      minimum_stabilized_mean_top_20pct_jaccard: 0.35
+      minimum_each_source_score_spearman: 0.50
+      minimum_each_source_top_10pct_jaccard: 0.15
+      minimum_each_source_top_20pct_jaccard: 0.20
+    baseline_comparison_role: descriptive_only_not_an_acceptance_gate
+    oracle_allowed: false
+    observed_outcome_allowed_for_causal_supervision: true
+    outcome_allowed_in_stability_metric: false
+  discovery:
+    registry_group: stabilized_discovery
+    run_seeds: [2503, 2521, 2539, 2557, 2579]
+    selection_partition: validation
+    selection_metric: best_validation_pairwise_loss
+    aggregate: minimum_mean
+    tie_breakers: [minimum_standard_deviation, lexicographic_variant_name]
+    oracle_allowed: false
+    test_partition_allowed: false
+    expected_locked_candidate: global_rank_only
+  confirmation:
+    registry_group: stabilized_confirmation
+    run_seeds: [2609, 2633, 2657, 2683, 2707, 2731, 2753, 2777, 2801, 2833]
+    sealed_until_candidate_declaration_written: true
+    minimum_runs: 10
+  fixed_dataset_stability:
+    registry_group: stabilized_fixed_dataset
+    dataset_seed: 7001
+    run_seeds: [2851, 2879, 2903, 2927, 2953]
+    fixed_component_names: [ranker_model_seed]
+    sealed_until_candidate_declaration_written: true
+    acceptance:
+      minimum_mean_score_spearman: 0.25
+      minimum_mean_top_10pct_jaccard: 0.10
+      minimum_mean_top_20pct_jaccard: 0.15
+      minimum_mean_recommended_patient_jaccard: 0.75
+      minimum_mean_allocated_patient_jaccard: 0.50
+  reporting:
+    capacity_fractions: [0.05, 0.10, 0.20]
+    stability_fractions: [0.10, 0.20]
+    subgroup_columns: [female, rurality, caregiver_available]
+    bootstrap_samples: 1000
+    paired_bootstrap_seed: 2971
+    registry_group: phase9b_reporting
+    confidence_level: 0.95
+    oracle_solver_time_limit_seconds: 120.0
+  failure_policy: stop_without_reselecting_on_confirmation_oracle
+
+scenarios:
+  - baseline_identifiable
+  - need_current_alignment
+  - unmet_need
+  - over_intensive_care
+  - risk_benefit_aligned
+  - risk_benefit_misaligned
+  - no_shared_response
+  - strong_observed_confounding
+  - poor_overlap
+  - sharp_null
+  - placebo_outcome
+  - hidden_confounding
+  - capacity_scarcity
+  - heterogeneous_profile_costs
+
+gates:
+  truth_tables_written_after_learner_boundary: true
+  implicit_action_to_profile_conversion_allowed: false
+  cross_domain_pairs_allowed: false
+  protected_profiles_enter_discretionary_ranking: false
+  require_all_structural_checks: true
+  require_scenario_direction_checks: true
+  primary_support_scenario: baseline_identifiable
+  require_all_primary_scenario_profiles_supported: true
+  require_primary_ranker_trained: true
+  require_primary_validation_within_and_cross_pairs: true
+  require_primary_recommendation_calibrated: true
+  require_recommendations_for_all_patients: true
+  require_zero_recommendation_ordering_and_deintensification_violations: true
+  require_zero_allocation_constraint_violations: true
+  require_capacity_scarcity_defers_more_recommendations: true
+  require_allocation_preserves_recommendations: true
+  require_phase8_diagnostic_exit_gates: true
+  require_phase9_protocol_exit_gates: true
+  oracle_used_for_model_selection: false
+  large_experiment: false
+
+# Methodological guardrails used by the same pipeline. These are kept here so an
+# experiment is fully described by one configuration file.
+scientific_contract:
+  contract_version: prometheus_profile_stratification_v1
+  frozen_on: 2026-07-20
+  contract_status: phase9b_v7_candidate_locked_before_confirmation
+
+  decision_unit:
+    primary: care_profile
+    key: [patient_id, care_profile_id]
+    only_supported_runtime: care_profile
+    silent_action_to_profile_conversion_allowed: false
+
+  catalogues:
+    care: configs/care_catalog.yaml
+    baseline_need: embedded_in_pipeline
+
+  patient_level_outputs:
+    baseline_need_level:
+      semantics: descriptive_dm77_aligned_need_independent_of_capacity_and_actionability
+    recommended_actionable_level:
+      semantics: supported_profile_level_with_maximum_validation_calibrated_incremental_benefit
+    allocated_care_level:
+      semantics: profile_level_activated_after_operational_constraints
+    must_remain_distinct: true
+
+  treatment_contract:
+    treatment_identifier: care_profile_id
+    treatment: assignment_to_one_versioned_target_care_profile
+    comparator_identifier: no_new_profile
+    comparator: maintenance_of_preindex_current_care_pathway
+    ambiguous_alternative_profile_mixture_allowed: false
+    current_care_field: current_care_profile
+    observed_treatment_field: observed_treatment_profile
+    current_care_equals_baseline_need_assumption: false
+    consistency_requires_profile_version: true
+
+  primary_outcome_contract:
+    ranking_domain: standard_hospital_free_days_365d
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    protected_palliative_domain_excluded: true
+
+  profile_comparability_gate:
+    required_equal_fields:
+      - outcome_name
+      - outcome_horizon
+      - outcome_unit
+      - benefit_direction
+      - ranking_domain
+    incompatible_profiles_share_global_scale: false
+    incompatible_profiles_generate_cross_pairs: false
+
+  eligibility_contract:
+    allowed_inputs:
+      - baseline_preindex_covariates
+      - baseline_need_level
+      - current_care_profile
+      - external_clinical_rules
+      - profile_catalogue
+    forbidden_inputs:
+      - observed_outcome
+      - future_utilization
+      - raw_priority_score
+      - calibrated_incremental_benefit
+      - recommended_profile_id
+      - allocated_profile_id
+      - oracle_fields
+    excluded_from_discretionary_ranking:
+      - mandatory_care
+      - protected_pathway
+      - urgent_case
+      - manual_review
+      - inadequate_empirical_support
+      - violated_prerequisite
+
+  causal_supervision:
+    nuisance_unit: profile_specific_binary_comparison
+    pseudo_outcome_field: dr_pseudo_outcome
+    estimator: repeated_cross_fitted_doubly_robust
+    pseudo_outcome_semantics: noisy_individual_supervision_not_observed_ite_or_oracle
+    robust_aggregation: split_local_median
+    comparator: no_new_profile
+    explicit_seed_required: true
+
+  ranking_contract:
+    primary_objective: direct_pairwise_causal_ranking
+    score_field: raw_priority_score
+    score_semantics: globally_comparable_ordinal_priority_within_ranking_domain
+    score_has_causal_zero: false
+    baseline_need_is_input: true
+    current_care_profile_is_input: true
+    profile_embedding: shared_across_opportunities
+    within_profile_pairs: required
+    cross_profile_pairs: required_when_comparability_gate_passes
+    rank_only_baseline: required
+    contrastive_v2:
+      role: auxiliary
+      separate_projection_head: required_except_explicit_ablation
+      may_replace_direct_ranking_objective: false
+
+  calibration_contract:
+    fit_partition: validation
+    target: heldout_robust_doubly_robust_signal_days
+    oracle_target_allowed: false
+    candidate_methods:
+      - pooled_isotonic
+      - reliability_weighted_pooled_isotonic
+      - monotonic_binned
+      - profile_mean_shrinkage
+    selector: minimum_validation_dr_mae_among_monotonic_finite_candidates
+    selector_tie_breakers:
+      - maximum_validation_rank_correlation
+      - lexicographic_method_name
+    output_field: calibrated_incremental_benefit
+    raw_score_replaced: false
+    recommendation_out_of_validation_score_range: abstain
+
+  recommendation_contract:
+    stage: after_ranking_and_validation_calibration_before_allocation
+    candidate_policy: same_or_higher_level_than_current_care_profile
+    deintensification_supported_in_v1: false
+    lateral_profile_change_supported: true
+    selector: argmax_calibrated_incremental_benefit
+    primary_minimum_benefit_threshold_days: 2.0
+    minimum_benefit_operator: strictly_greater_than
+    threshold_status: synthetic_methodological_not_clinically_validated
+    sensitivity_thresholds_evaluation_only: [0.0, 2.0, 5.0]
+    support_requirements:
+      propensity_lower: 0.05
+      propensity_upper: 0.95
+      minimum_profile_effective_sample_size: 30
+      require_patient_empirical_support: true
+      require_score_inside_validation_calibration_range: true
+      require_profile_validation_lower_bound_above_null: true
+      profile_validation_evidence_is_individual_interval: false
+    tie_breakers:
+      - maximum_raw_priority_score
+      - lexicographic_care_profile_id
+    unsupported_or_below_threshold_policy: abstain_to_baseline_need_level
+    abstention_outputs:
+      recommended_actionable_level: baseline_need_level
+      recommended_profile_id: null
+      recommendation_abstained: true
+    capacity_inputs_allowed: false
+    record_written_before_allocation: true
+    record_written_before_oracle_open: true
+
+  allocation_contract:
+    stage: after_recommendation_freeze
+    candidate_profiles: recommended_profile_only
+    alternative_profile_substitution_allowed: false
+    no_capacity_policy: defer_recommendation_and_keep_current_care
+    recommendation_may_be_overwritten: false
+    allocated_level_when_deferred: current_care_profile_level
+    objective_field: calibrated_incremental_benefit
+    constraints:
+      - eligibility
+      - shared_budget
+      - profile_capacity
+      - capacity_pool
+      - incremental_missing_component_cost
+      - prerequisites
+      - protected_pathway
+      - mutual_exclusion
+      - at_most_one_primary_profile_per_patient
+    resource_accounting: missing_profile_components_relative_to_current_care
+    existing_components_charged_again: false
+    component_capacity_double_counting_allowed: false
+    tie_breaker: seeded_stable_epsilon_then_patient_and_profile_id
+    tie_break_seed: required_from_run_configuration
+    fixed_capacity_ordinal_diagnostic_uses_calibration: false
+
+  diagnostic_contract:
+    stage: after_complete_decision_stack_before_large_experiments
+    negative_control_scenarios:
+      - sharp_null
+      - placebo_outcome
+      - baseline_identifiable_with_permuted_training_pair_labels
+    heldout_diagnostic_partition: test
+    heldout_partition_used_for_fitting_early_stopping_or_calibration: false
+    multi_seed_required: true
+    seed_source: seed_registry_consumed_negative_control_diagnostics
+    oracle_targets_allowed: false
+    diagnostic_results_select_primary_model: false
+    ablations:
+      - no_shared_response
+      - within_profile_training_only_vs_cross_profile_training
+      - rank_only_vs_contrastive_v2
+      - rules_vs_supervised_need
+      - validation_calibrator_candidates
+      - recommendation_thresholds_0_2_5_days
+      - hidden_confounding_declared_identification_failure
+    hidden_confounding_eligible_for_optimization: false
+    failure_policy: stop_before_large_experiments_and_version_diagnostic_protocol
+
+  experiment_contract:
+    execution_order:
+      - bounded_software_validation
+      - nonoracle_stability_source_diagnostics
+      - stabilization_exit_gates
+      - nonoracle_discovery
+      - candidate_declaration_written_and_hashed
+      - untouched_confirmation
+      - fixed_dataset_stability
+      - oracle_unblinding_after_per_run_decision_freeze
+    primary_scenario: baseline_identifiable
+    discovery_selection_partition: validation
+    discovery_oracle_allowed: false
+    discovery_test_partition_allowed: false
+    stabilization_diagnostics_oracle_allowed: false
+    stabilization_diagnostics_outcome_metric_allowed: false
+    stabilization_thresholds_frozen_before_run: true
+    candidate_variants: [global_rank_only, global_rank_plus_contrastive]
+    confirmation_seed_count: 10
+    fixed_dataset_seed_count: 1
+    fixed_dataset_run_seed_count: 5
+    candidate_may_change_after_confirmation_unblinding: false
+    paired_uncertainty_required: true
+    four_reporting_layers_required:
+      - baseline_need
+      - causal_ranking
+      - recommendation
+      - allocation
+    oracle_unblinding_requires_per_run_freeze_record: true
+    synthetic_results_are_clinical_evidence: false
+
+  oracle_boundary:
+    forbidden_operational_prefixes:
+      - true_
+      - oracle_
+      - potential_outcome
+      - latent_
+    forbidden_stages:
+      - baseline_need_fitting
+      - baseline_need_thresholds
+      - eligibility
+      - nuisance_fitting
+      - pair_generation
+      - ranking_training
+      - checkpoint_selection
+      - hyperparameter_selection
+      - calibration
+      - recommendation
+      - allocation
+    evaluation_open_condition:
+      - baseline_need_model_frozen
+      - ranker_frozen
+      - calibrator_frozen
+      - recommendation_policy_frozen
+      - recommendations_written
+      - allocation_policy_frozen
+      - allocations_written
+    oracle_join_stage: final_synthetic_evaluation_only
+
+  artifact_contract:
+    manifest_version: prometheus_profile_stratification_manifest_v1
+    required_preoracle_artifacts:
+      - baseline_need_assessment.csv
+      - patient_current_care_profile.csv
+      - care_profile_eligibility.csv
+      - patient_profile_opportunities.csv
+      - profile_causal_supervision.csv
+      - supported_profile_opportunities.csv
+      - profile_priority_scores.csv
+      - profile_ranker_validation_pairs.csv
+      - profile_ranker_audit.json
+      - profile_ranker_freeze.json
+      - primary_profile_ranker.pt
+      - profile_calibration_diagnostics.csv
+      - actionable_profile_recommendations.csv
+      - profile_allocation_decisions.csv
+      - profile_allocation_diagnostics.csv
+      - profile_allocation_contract.json
+      - profile_decision_contract.json
+    required_run_diagnostic_artifacts:
+      - profile_diagnostic_campaign.csv
+      - profile_diagnostic_contract.json
+    required_run_experiment_artifacts:
+      - profile_stability_diagnostics.csv
+      - profile_stability_contract.json
+      - profile_experiment_discovery.csv
+      - profile_candidate_declaration.json
+      - profile_experiment_freezes.csv
+      - profile_experiment_metrics.csv
+      - profile_experiment_contract.json
+    required_evaluation_artifacts:
+      - baseline_need_metrics.csv
+      - profile_ranking_metrics.csv
+      - recommendation_metrics.csv
+      - profile_allocation_metrics.csv
+    superseded_artifact_names_reused: false
+
+  claim_contract:
+    target_design_wording: PROMETHEUS combines a DM77-aligned baseline need stratification with a direct causal actionability layer that ranks admissible care profiles and separates recommendation from allocation.
+    currently_implemented: true
+    forbidden_claims:
+      - clinically_validated_for_italy
+      - equivalent_or_superior_to_acg
+      - reproduces_acg_stratification
+      - improves_patient_outcomes_in_practice
+      - deployment_ready
+
+# Seed governance is embedded to keep every stochastic choice auditable without a
+# second registry file.
+seed_registry:
+  registry_version: prometheus_profile_stratification_seed_registry_v1
+  frozen_on: 2026-07-20
+  scientific_contract: prometheus_profile_stratification_v1
+
+  policy:
+    explicit_seed_required: true
+    dataset_and_model_seeds_separate: true
+    discovery_must_not_read_oracle: true
+    confirmation_seeds_must_not_be_used_for_discovery: true
+    oracle_unblinding_requires_model_recommendation_and_allocation_freeze: true
+    superseded_seed_registries_reused_automatically: false
+
+  consumed:
+    need_and_contract_debug:
+      status: consumed_for_schema_implementation_and_bounded_pipeline_check_only
+      run_seeds: [1103, 1129, 1151, 1171, 1181, 1187, 1193]
+
+    profile_dgp_debug:
+      status: consumed_for_profile_dgp_direction_tests_and_bounded_pipeline_check
+      run_seeds: [2101, 2111, 2129, 2141, 2153, 2161, 2179, 2203]
+
+    profile_causal_supervision_debug:
+      status: consumed_for_split_cross_fitting_and_bounded_pipeline_check
+      run_seeds: [2213, 2237, 2338, 2439, 2540, 2641]
+
+    profile_ranker_implementation_debug:
+      status: consumed_for_direct_profile_ranking_and_bounded_pipeline_check
+      run_seeds: [2267, 2273, 2281, 2287, 2293, 2297]
+
+    profile_allocator_implementation_debug:
+      status: consumed_for_cardinal_allocation_and_ordinal_diagnostics
+      run_seeds: [2309]
+
+    negative_control_diagnostics:
+      status: consumed_for_phase8_nonoracle_negative_controls_and_ablations
+      run_seeds: [1201, 1223, 1249, 1277, 1301]
+
+    discovery:
+      status: consumed_for_completed_phase9_nonoracle_candidate_selection_do_not_reuse
+      run_seeds: [1409, 1433, 1459, 1481, 1511]
+
+    confirmation:
+      status: consumed_for_completed_phase9_confirmation_do_not_reuse
+      run_seeds: [1601, 1627, 1657, 1693, 1721, 1753, 1789, 1811, 1847, 1873]
+
+    fixed_dataset_stability:
+      status: consumed_for_completed_phase9_stability_do_not_reuse
+      dataset_seeds: [5003]
+      run_seeds: [1901, 1931, 1951, 1979, 2011]
+
+    phase9_reporting:
+      status: consumed_for_completed_phase9_reporting_do_not_reuse
+      run_seeds: [2039]
+
+    stability_diagnostics:
+      status: consumed_for_failed_phase9b_v2_nonoracle_source_diagnostics_do_not_reuse
+      dataset_seeds: [6007]
+      run_seeds: [2401, 2411, 2423, 2437]
+
+    stability_diagnostics_v3:
+      status: retired_unopened_after_v3_support_failure_do_not_reuse
+      dataset_seeds: [6011]
+      run_seeds: [3001, 3011, 3023, 3037]
+
+    stability_diagnostics_v4:
+      status: consumed_for_failed_phase9b_v4_split_sensitivity_do_not_reuse
+      dataset_seeds: [6029]
+      run_seeds: [3109, 3121, 3137, 3163]
+
+    stability_diagnostics_v5:
+      status: consumed_for_failed_phase9b_v5_baseline_relative_gates_do_not_reuse
+      dataset_seeds: [6037]
+      run_seeds: [3203, 3217, 3229, 3251]
+
+    stability_diagnostics_v6:
+      status: consumed_for_failed_phase9b_v6_sample_size_diagnostics_do_not_reuse
+      dataset_seeds: [6049]
+      run_seeds: [3301, 3313, 3329, 3343]
+
+    stability_diagnostics_v7:
+      status: consumed_for_passed_phase9b_v7_nonoracle_stability_do_not_reuse
+      dataset_seeds: [6073]
+      run_seeds: [3503, 3517, 3533, 3557]
+
+    stabilized_discovery:
+      status: consumed_for_phase9b_v7_nonoracle_candidate_selection_do_not_reuse
+      run_seeds: [2503, 2521, 2539, 2557, 2579]
+
+    stabilized_confirmation:
+      status: reserved_now_open_only_after_phase9b_candidate_declaration_freeze
+      run_seeds: [2609, 2633, 2657, 2683, 2707, 2731, 2753, 2777, 2801, 2833]
+
+    stabilized_fixed_dataset:
+      status: reserved_now_open_only_after_phase9b_candidate_declaration_freeze
+      dataset_seeds: [7001]
+      run_seeds: [2851, 2879, 2903, 2927, 2953]
+
+    phase9b_reporting:
+      status: reserved_unopened_for_phase9b_paired_bootstrap_uncertainty
+      run_seeds: [2971]
+
+  reserved: {}

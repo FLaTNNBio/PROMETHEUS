@@ -1,22 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
-import yaml
 
-from causal_population_ranking.causal_utilization.global_simulation import simulate_multivalued_care
 from causal_population_ranking.dm77 import (
     assess_dm77_population,
-    derive_intervention_eligibility,
+    load_baseline_need_contract,
     load_dm77_settings,
     summarize_dm77_population,
 )
 
 
 def _settings():
-    return load_dm77_settings({"config_path": "configs/dm77/default.yaml"})
+    contract = load_baseline_need_contract()
+    return load_dm77_settings(contract["modes"]["rules"]["settings"])
 
 
 def _profiles() -> pd.DataFrame:
@@ -95,21 +92,6 @@ def test_treatment_outcome_oracle_and_causal_scores_are_ignored():
     assert second_audit["oracle_used"] is False
 
 
-def test_catalog_routes_level_vi_only_to_protected_palliative_pathway():
-    assessments, _ = assess_dm77_population(_profiles(), _settings())
-    eligibility = derive_intervention_eligibility(
-        assessments, "configs/dm77/intervention_catalog.yaml"
-    )
-    level_vi = eligibility.loc[eligibility.patient_id == "level_6"]
-    selected = level_vi.loc[level_vi.catalog_eligible, "intervention_id"].tolist()
-    assert selected == ["palliative_care_pathway"]
-    assert level_vi.loc[level_vi.catalog_eligible, "protected_pathway"].all()
-    manual = eligibility.loc[eligibility.patient_id == "manual"]
-    assert not manual.catalog_eligible.any()
-    assert manual.requires_professional_review.all()
-    assert not eligibility.causal_effectiveness_established.any()
-
-
 def test_summary_is_complete_and_preserves_population_total():
     assessments, _ = assess_dm77_population(_profiles(), _settings())
     summary = summarize_dm77_population(assessments)
@@ -118,32 +100,8 @@ def test_summary_is_complete_and_preserves_population_total():
     assert np.isclose(float(summary.population_fraction.sum()), 1.0)
 
 
-def test_semisynthetic_dm77_covariates_are_pre_index_but_derived_level_is_not_a_feature():
-    rng = np.random.default_rng(31)
-    cohort = pd.DataFrame({
-        "patient_id": [f"p{index:04d}" for index in range(250)],
-        "age": rng.uniform(18, 92, 250),
-        "condition_distinct": rng.poisson(3, 250),
-        "prior_inpatient": rng.poisson(0.8, 250),
-        "prior_emergency": rng.poisson(1.0, 250),
-        "medication_distinct": rng.poisson(4, 250),
-        "recent_utilization_trend": rng.normal(size=250),
-    })
-    first = simulate_multivalued_care(cohort, seed=71)
-    second = simulate_multivalued_care(cohort, seed=71)
-    generated = {
-        "frailty_index", "functional_limitation_score", "social_fragility_score",
-        "cognitive_impairment", "non_self_sufficiency", "caregiver_available",
-        "housing_instability", "palliative_need",
-    }
-    assert generated <= set(first.feature_columns)
-    assert "dm77_need_level" not in first.feature_columns
-    assert not any(column.startswith("dm77_") for column in first.feature_columns)
-    pd.testing.assert_frame_equal(first.learner, second.learner)
-
-
 def test_dm77_configuration_explicitly_marks_research_profile():
-    raw = yaml.safe_load(Path("configs/dm77/default.yaml").read_text(encoding="utf-8"))
-    assert raw["threshold_profile"] == "research_default_not_official"
-    assert raw["missing_data_policy"] == "manual_review"
-    assert raw["exclude_level_vi_from_standard_allocation"] is True
+    settings = load_baseline_need_contract()["modes"]["rules"]["settings"]
+    assert settings["threshold_profile"] == "research_default_not_official"
+    assert settings["missing_data_policy"] == "manual_review"
+    assert settings["exclude_level_vi_from_standard_allocation"] is True

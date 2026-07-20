@@ -1,13 +1,28 @@
-from .metrics import evaluate_ranker
-from .global_metrics import global_pairwise_concordance
-from .action_policy_metrics import (
-    allocation_budget_metrics,
-    ranking_stability_metrics,
-    score_group_diagnostics,
-    synthetic_top_q_metrics,
+"""Stable public evaluation API for PROMETHEUS."""
+
+from .baseline import BaselineNeedEvaluationResult, evaluate_baseline_need
+from .ranking import (
+    evaluate_profile_allocation,
+    evaluate_profile_ranking_scores,
+    evaluate_profile_recommendations,
+    linear_calibration_metrics,
+    observational_ranking_metrics,
+    oracle_ranking_metrics,
+    pairwise_concordance,
+    profile_concordance_metrics,
+    rank_weighted_metrics,
 )
 
 __all__ = [
-    "evaluate_ranker", "global_pairwise_concordance", "allocation_budget_metrics",
-    "ranking_stability_metrics", "score_group_diagnostics", "synthetic_top_q_metrics",
+    "BaselineNeedEvaluationResult",
+    "evaluate_baseline_need",
+    "evaluate_profile_allocation",
+    "evaluate_profile_ranking_scores",
+    "evaluate_profile_recommendations",
+    "linear_calibration_metrics",
+    "observational_ranking_metrics",
+    "oracle_ranking_metrics",
+    "pairwise_concordance",
+    "profile_concordance_metrics",
+    "rank_weighted_metrics",
 ]

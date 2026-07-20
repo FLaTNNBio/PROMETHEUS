@@ -7,9 +7,6 @@ __pycache__/
 venv/
 env/
 .conda/
-*.egg-info/
-.coverage
-htmlcov/
 synthea/
 vendor/synthea/
 data/synthea/
@@ -21,7 +18,7 @@ artifacts/runs/*/checkpoints/
 artifacts/runs/*/*.pt
 *.tmp
 *.log
-/artifacts/
+/artifacts
 
 # Local Codex / AI-agent configuration
 /.codex/

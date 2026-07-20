@@ -1,8 +1,19 @@
-from .prometheus_ranker import PrometheusRanker, TRAINING_MODES, TransitionArrays
-from .opportunities import OpportunityArrays
-from .global_ranker import GlobalPrometheusRanker, GLOBAL_TRAINING_MODES
+"""Direct global patient-profile causal ranking."""
+
+from .profile_ranker import (
+    PROFILE_RANKING_VARIANTS,
+    PairBatch,
+    ProfileRankingResult,
+    pairwise_ranking_loss,
+    sample_profile_pairs,
+    train_profile_rankers,
+)
 
 __all__ = [
-    "PrometheusRanker", "TRAINING_MODES", "TransitionArrays", "OpportunityArrays",
-    "GlobalPrometheusRanker", "GLOBAL_TRAINING_MODES",
+    "PROFILE_RANKING_VARIANTS",
+    "PairBatch",
+    "ProfileRankingResult",
+    "pairwise_ranking_loss",
+    "sample_profile_pairs",
+    "train_profile_rankers",
 ]

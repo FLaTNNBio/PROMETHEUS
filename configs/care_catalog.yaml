@@ -1,0 +1,380 @@
+catalog_version: prometheus_dm77_care_profiles_v1
+component_action_catalog_version: dm77_computable_care_actions_v1
+catalog_status: synthetic_research_operationalization_not_official_dm77
+profile_composition_semantics: ordered_target_pathway_bundle
+resource_cost_semantics: sum_of_declared_bundle_component_action_costs
+patient_cost_semantics: sum_of_missing_component_activation_costs
+primary_ranking_domain: standard_hospital_free_days_365d
+
+care_states:
+  - state_id: routine_primary_care
+    active_services: [routine_primary_care]
+  - state_id: structured_followup
+    active_services: [routine_primary_care, structured_followup]
+  - state_id: chronic_disease_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management]
+  - state_id: proactive_case_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management]
+  - state_id: remote_multidisciplinary_management
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management, remote_multidisciplinary_management]
+  - state_id: high_intensity_home_support
+    active_services: [routine_primary_care, structured_followup, chronic_disease_management, proactive_case_management, remote_multidisciplinary_management, high_intensity_home_support]
+  - state_id: protected_palliative_care
+    active_services: [protected_palliative_care]
+
+actions:
+  - action_id: add_structured_followup
+    from_states: [routine_primary_care]
+    to_state: structured_followup
+    eligible_dm77_levels: [II, III]
+    clinical_rules: {min_condition_distinct: 0}
+    contraindications: [palliative_need]
+    prerequisites: [routine_primary_care]
+    mutually_exclusive_with: [start_chronic_disease_management]
+    capacity_pool: followup_capacity
+    cost: 1.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 3.0
+    synthetic_effect_scale_days: 4.0
+
+  - action_id: start_chronic_disease_management
+    from_states: [routine_primary_care, structured_followup]
+    to_state: chronic_disease_management
+    eligible_dm77_levels: [II, III, IV]
+    clinical_rules: {min_condition_distinct: 1}
+    contraindications: [palliative_need]
+    prerequisites: [routine_primary_care]
+    mutually_exclusive_with: [add_structured_followup, add_proactive_case_management]
+    capacity_pool: chronic_management_capacity
+    cost: 1.5
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.5
+    synthetic_effect_scale_days: 5.5
+
+  - action_id: add_proactive_case_management
+    from_states: [structured_followup, chronic_disease_management]
+    to_state: proactive_case_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2}
+    contraindications: [palliative_need]
+    prerequisites: [structured_followup]
+    mutually_exclusive_with: [start_chronic_disease_management, add_remote_monitoring, add_multidisciplinary_coordination]
+    capacity_pool: case_management_capacity
+    cost: 2.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 5.0
+    synthetic_effect_scale_days: 6.0
+
+  - action_id: add_remote_monitoring
+    from_states: [chronic_disease_management, proactive_case_management]
+    to_state: remote_multidisciplinary_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2, max_social_fragility_score: 0.85}
+    contraindications: [palliative_need, housing_instability]
+    prerequisites: [chronic_disease_management]
+    mutually_exclusive_with: [add_proactive_case_management, add_multidisciplinary_coordination, add_high_intensity_home_support]
+    capacity_pool: remote_monitoring_capacity
+    cost: 2.5
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.0
+    synthetic_effect_scale_days: 6.5
+
+  - action_id: add_multidisciplinary_coordination
+    from_states: [chronic_disease_management, proactive_case_management]
+    to_state: remote_multidisciplinary_management
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_condition_distinct: 2}
+    contraindications: [palliative_need]
+    prerequisites: [chronic_disease_management]
+    mutually_exclusive_with: [add_proactive_case_management, add_remote_monitoring, add_high_intensity_home_support]
+    capacity_pool: multidisciplinary_capacity
+    cost: 2.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 5.5
+    synthetic_effect_scale_days: 6.5
+
+  - action_id: add_high_intensity_home_support
+    from_states: [proactive_case_management, remote_multidisciplinary_management]
+    to_state: high_intensity_home_support
+    eligible_dm77_levels: [III, IV, V]
+    clinical_rules: {min_functional_limitation_score: 0.25}
+    contraindications: [palliative_need]
+    prerequisites: [proactive_case_management]
+    mutually_exclusive_with: [add_remote_monitoring, add_multidisciplinary_coordination]
+    capacity_pool: home_support_capacity
+    cost: 4.0
+    mandatory: false
+    protected: false
+    outcome_name: days_alive_outside_acute_hospital_365d
+    followup_horizon: 365
+    outcome_direction: higher_is_better
+    outcome_unit: days
+    synthetic_effect_mean_days: 4.0
+    synthetic_effect_scale_days: 7.0
+
+  - action_id: protected_palliative_pathway
+    from_states:
+      - routine_primary_care
+      - structured_followup
+      - chronic_disease_management
+      - proactive_case_management
+      - remote_multidisciplinary_management
+      - high_intensity_home_support
+    to_state: protected_palliative_care
+    eligible_dm77_levels: [VI]
+    clinical_rules: {requires_palliative_need: true}
+    contraindications: []
+    prerequisites: []
+    mutually_exclusive_with: []
+    capacity_pool: protected_palliative_capacity
+    cost: 0.0
+    mandatory: true
+    protected: true
+    outcome_name: goal_concordant_palliative_care_days
+    followup_horizon: 90
+    outcome_direction: higher_is_better
+    outcome_unit: days
+
+profiles:
+  - care_profile_id: profile_i_routine_primary_care
+    care_profile_level: 1
+    care_profile_name: Routine primary care maintenance
+    resulting_care_state: routine_primary_care
+    included_care_actions: []
+    action_application_order: []
+    admissible_current_profile_ids: []
+    eligible_baseline_need_levels: [1, 2]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 0.0
+    capacity_pool: none
+    capacity_requirements: {}
+    clinical_prerequisites: [routine_primary_care]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: true
+    automatic_rank_candidate: false
+
+  - care_profile_id: profile_ii_structured_followup
+    care_profile_level: 2
+    care_profile_name: Structured proactive follow-up
+    resulting_care_state: structured_followup
+    included_care_actions: [add_structured_followup]
+    action_application_order: [add_structured_followup]
+    admissible_current_profile_ids: [profile_i_routine_primary_care]
+    eligible_baseline_need_levels: [2, 3]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 1.0
+    capacity_pool: followup_capacity
+    capacity_requirements: {followup_capacity: 1}
+    clinical_prerequisites: [routine_primary_care]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_iii_chronic_management
+    care_profile_level: 3
+    care_profile_name: Structured chronic-disease management
+    resulting_care_state: chronic_disease_management
+    included_care_actions: [start_chronic_disease_management]
+    action_application_order: [start_chronic_disease_management]
+    admissible_current_profile_ids:
+      - profile_i_routine_primary_care
+      - profile_ii_structured_followup
+    eligible_baseline_need_levels: [2, 3, 4]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 1.5
+    capacity_pool: chronic_management_capacity
+    capacity_requirements: {chronic_management_capacity: 1}
+    clinical_prerequisites: [routine_primary_care]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_iv_proactive_case_management
+    care_profile_level: 4
+    care_profile_name: Proactive case-management pathway
+    resulting_care_state: proactive_case_management
+    included_care_actions: [add_proactive_case_management]
+    action_application_order: [add_proactive_case_management]
+    admissible_current_profile_ids:
+      - profile_ii_structured_followup
+      - profile_iii_chronic_management
+    eligible_baseline_need_levels: [3, 4, 5]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 2.0
+    capacity_pool: case_management_capacity
+    capacity_requirements: {case_management_capacity: 1}
+    clinical_prerequisites: [structured_followup]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_iv_remote_monitoring
+    care_profile_level: 4
+    care_profile_name: Chronic management with remote monitoring
+    resulting_care_state: remote_multidisciplinary_management
+    included_care_actions:
+      - start_chronic_disease_management
+      - add_remote_monitoring
+    action_application_order:
+      - start_chronic_disease_management
+      - add_remote_monitoring
+    admissible_current_profile_ids:
+      - profile_i_routine_primary_care
+      - profile_ii_structured_followup
+      - profile_iii_chronic_management
+      - profile_iv_proactive_case_management
+    eligible_baseline_need_levels: [3, 4, 5]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 4.0
+    capacity_pool: remote_monitoring_capacity
+    capacity_requirements:
+      chronic_management_capacity: 1
+      remote_monitoring_capacity: 1
+    clinical_prerequisites: [routine_primary_care]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_iv_multidisciplinary_coordination
+    care_profile_level: 4
+    care_profile_name: Chronic management with multidisciplinary coordination
+    resulting_care_state: remote_multidisciplinary_management
+    included_care_actions:
+      - start_chronic_disease_management
+      - add_multidisciplinary_coordination
+    action_application_order:
+      - start_chronic_disease_management
+      - add_multidisciplinary_coordination
+    admissible_current_profile_ids:
+      - profile_i_routine_primary_care
+      - profile_ii_structured_followup
+      - profile_iii_chronic_management
+      - profile_iv_proactive_case_management
+    eligible_baseline_need_levels: [3, 4, 5]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 3.5
+    capacity_pool: multidisciplinary_capacity
+    capacity_requirements:
+      chronic_management_capacity: 1
+      multidisciplinary_capacity: 1
+    clinical_prerequisites: [routine_primary_care]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_v_integrated_home_support
+    care_profile_level: 5
+    care_profile_name: Integrated high-intensity home-support pathway
+    resulting_care_state: high_intensity_home_support
+    included_care_actions:
+      - add_proactive_case_management
+      - add_high_intensity_home_support
+    action_application_order:
+      - add_proactive_case_management
+      - add_high_intensity_home_support
+    admissible_current_profile_ids:
+      - profile_ii_structured_followup
+      - profile_iii_chronic_management
+      - profile_iv_proactive_case_management
+      - profile_iv_remote_monitoring
+      - profile_iv_multidisciplinary_coordination
+    eligible_baseline_need_levels: [3, 4, 5]
+    outcome_name: days_alive_outside_acute_hospital_365d
+    outcome_horizon: 365
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: standard_hospital_free_days_365d
+    resource_cost: 6.0
+    capacity_pool: home_support_capacity
+    capacity_requirements:
+      case_management_capacity: 1
+      home_support_capacity: 1
+    clinical_prerequisites: [structured_followup]
+    mandatory: false
+    protected: false
+    maintenance_reference_only: false
+    automatic_rank_candidate: true
+
+  - care_profile_id: profile_vi_protected_palliative
+    care_profile_level: 6
+    care_profile_name: Protected palliative-care pathway
+    resulting_care_state: protected_palliative_care
+    included_care_actions: [protected_palliative_pathway]
+    action_application_order: [protected_palliative_pathway]
+    admissible_current_profile_ids:
+      - profile_i_routine_primary_care
+      - profile_ii_structured_followup
+      - profile_iii_chronic_management
+      - profile_iv_proactive_case_management
+      - profile_iv_remote_monitoring
+      - profile_iv_multidisciplinary_coordination
+      - profile_v_integrated_home_support
+    eligible_baseline_need_levels: [6]
+    outcome_name: goal_concordant_palliative_care_days
+    outcome_horizon: 90
+    outcome_unit: days
+    benefit_direction: higher_is_better
+    ranking_domain: protected_palliative_90d
+    resource_cost: 0.0
+    capacity_pool: protected_palliative_capacity
+    capacity_requirements: {protected_palliative_capacity: 1}
+    clinical_prerequisites: [palliative_need]
+    mandatory: true
+    protected: true
+    maintenance_reference_only: false
+    automatic_rank_candidate: false

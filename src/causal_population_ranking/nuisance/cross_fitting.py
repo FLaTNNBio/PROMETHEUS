@@ -22,12 +22,16 @@ def _pred(model,x,binary): return model.predict_proba(x)[:,1] if binary else mod
 
 
 def _transition_treatment(learner: pd.DataFrame) -> tuple[np.ndarray, str]:
-    column = "transition_treatment" if "transition_treatment" in learner else "treatment"
+    column = next(
+        (name for name in ("profile_treatment", "transition_treatment", "treatment")
+         if name in learner),
+        "treatment",
+    )
     if column not in learner:
-        raise ValueError("Missing transition-specific binary treatment D")
+        raise ValueError("Missing profile-specific binary treatment D")
     values = learner[column].to_numpy(int)
     if set(np.unique(values)) - {0, 1}:
-        raise ValueError("Transition-specific treatment D must be binary")
+        raise ValueError("Profile-specific treatment D must be binary")
     return values, column
 
 

@@ -1,157 +1,90 @@
 # PROMETHEUS
 
-PROMETHEUS is a direct global causal-ranking method over patient-action
-opportunities. The integrated default path operationalizes the DM 77 research rule
-engine without treating a DM 77 level as a treatment or as a model output.
+PROMETHEUS is a research pipeline for direct causal ranking of admissible
+patient-care-profile opportunities. It keeps three outputs separate:
 
 ```text
-pre-index patient data
-  -> DM77 multidimensional need assessment
-  -> pre-index current care state
-  -> authoritative catalog eligibility
-  -> action-specific nuisance models and cross-fitted DR signals
-  -> split-local robust DR aggregation
-  -> direct global patient-action ranking
-  -> fixed-set validation checkpoint and validation-only calibration
-  -> shared-budget and capacity-constrained allocation
+baseline need != causal recommendation != operational allocation
 ```
 
-The three central concepts remain separate:
+The primary decision unit is `(patient_id, care_profile_id)`. The raw priority score
+is ordinal: it is not a calibrated individual treatment effect and is never compared
+directly with zero.
 
-| Concept | Field | Role |
-| --- | --- | --- |
-| Multidimensional need | `dm77_need_level` | Rules-based context and action eligibility |
-| Services already active | `current_care_state` | Pre-index network input and transition consistency |
-| Causal treatment | `care_action_id` / `action_id` | Concrete care modification ranked by PROMETHEUS |
+## Current pipeline
 
-The network learns `s_theta(X_i, a)` with a shared clinical encoder and a stable
-numeric embedding for each `action_id`. Its raw score is an ordinal global priority,
-not a calibrated individual treatment effect. It directly compares both within-action
-and cross-action pairs when all actions share the same outcome semantics. The derived
-DM 77 level is not a ranker feature, treatment, pair target, or learned output.
+The repository currently implements one integrated path through the synthetic
+care-profile DGP:
 
-The optional causal-contrastive v2 regularizer has a projection head separate from
-the ranking score, requests balanced within-/cross-action contrastive pairs, and
-weights them using agreement across repeated cross-fitted DR signals. It never uses
-synthetic ground truth for training or selection.
+```text
+seeded pre-index synthetic population
+  -> baseline-need assessment
+  -> current care profile
+  -> governed profile eligibility
+  -> exact observed profile or no_new_profile
+  -> common observed outcome
+  -> patient-disjoint protocol splits
+  -> repeated cross-fitted profile-specific nuisance models
+  -> robust doubly-robust ranking supervision
+  -> stable within-profile and cross-profile DR pairs
+  -> direct global patient-profile ranker over two prespecified variants
+  -> ordinal priority scores for supported opportunities
+  -> validation-only monotone calibration selection
+  -> actionable profile recommendation or explicit baseline fallback
+  -> cardinal MILP allocation over frozen recommendations
+  -> separate fixed-count ordinal diagnostics
+  -> five-seed held-out negative controls and prespecified ablations
+  -> frozen diagnostic gates before large experiments
+  -> five-run non-oracle discovery and hashed candidate declaration
+  -> ten untouched confirmations plus five fixed-dataset stability runs
+  -> paired uncertainty across four reporting layers
+  -> frozen allocation/truth physical boundary
+```
 
-## Quick start
+Phases 8 and 9 run through this same pipeline, without separate phase runners. The
+prespecified discovery selected `global_rank_only`; the candidate was written and
+hashed before confirmation seeds were opened. The completed synthetic run is
+`artifacts/prometheus_pipeline/20260720T181643Z` and passed all 9 protocol-integrity
+gates. Fixed-dataset ranking stability was weak, so the result does not support a
+stability, clinical or deployment claim.
+
+## Run
 
 ```powershell
 py -m pip install -e .
+causal-ranking run --config configs\pipeline.yaml
+```
+
+The equivalent source command is:
+
+```powershell
+py src\scripts\run_pipeline.py --config configs\pipeline.yaml
+```
+
+An experiment is defined by a configuration using the same pipeline schema. The
+canonical configuration runs all frozen synthetic scenarios; a smaller experiment
+may use an ordered subset. There is no command-line switch for development phases.
+`configs/` contains only `pipeline.yaml` (experiment, contracts and seeds) and
+`care_catalog.yaml` (care states, component actions and target profiles).
+
+## Verify
+
+```powershell
 py -m pytest
-py src\scripts\run_prometheus.py --config configs\prometheus\dm77_integrated_smoke.yaml
 ```
 
-For the causal-contrastive v2 end-to-end smoke:
+The current suite contains 77 passing tests.
 
-```powershell
-py src\scripts\run_prometheus.py --config configs\prometheus\dm77_integrated_contrastive_v2_smoke.yaml
-```
-
-The package CLI uses the integrated full configuration by default:
-
-```powershell
-causal-ranking run
-causal-ranking run --config configs\prometheus\dm77_integrated_smoke.yaml
-```
-
-Multi-seed comparisons, fixed-dataset stability, and future adjudicated-panel DM77
-evaluation use the scripts under `src/scripts/`; see
-`docs/prometheus_validation_roadmap.md` for the exact evidence and claim boundaries.
-
-Without an editable installation, set the source path first:
-
-```powershell
-$env:PYTHONPATH="src"
-py src\scripts\run_prometheus.py --config configs\prometheus\dm77_integrated_smoke.yaml
-```
-
-The smoke configuration runs entirely on CPU with a seeded, fully synthetic
-longitudinal population. The larger methodological configuration is
-`configs/prometheus/dm77_integrated_default.yaml`. The computable care catalog is
-`configs/dm77/care_action_catalog.yaml`.
-
-## Integrated outputs
-
-Every integrated run writes at least:
-
-- `dm77_need_assessment.csv`;
-- `patient_current_care_state.csv`;
-- `dm77_action_eligibility.csv`;
-- `patient_action_opportunities.csv`;
-- `action_specific_dr_signals.csv`;
-- `action_specific_dr_diagnostics.csv`;
-- `global_ranking.csv`;
-- `calibration_diagnostics.csv`;
-- `calibration_score_group_diagnostics.csv`;
-- `baseline_comparison.csv`;
-- `baseline_policy_assignments.csv`;
-- `observed_test_rate_metrics.csv` and `actionwise_ope_metrics.csv`;
-- `allocator_ablation.csv` and `allocator_ablation_diagnostics.json`;
-- `budget_value_curve.csv` and `budget_curve_summary.csv`;
-- `subgroup_policy_metrics.csv` and `worst_group_summary.csv`;
-- `risk_causal_policy_discordance.csv`;
-- `allocation_decisions.csv`;
-- `protected_and_manual_review_cases.csv`;
-- `run_manifest.json` and the versioned model checkpoint.
-
-The additional non-oracle comparators include a direct pairwise GBDT ranker,
-pooled and independent DR-GBDT models, an action-conditioned DR ExtraTrees model,
-and a shallow DR policy tree. They are comparators only: the primary PROMETHEUS
-pipeline remains direct causal ranking and never estimates an individual CATE and
-sorts it. Method ablations and falsification controls are declared in
-`configs/prometheus/dm77_method_ablation_suites.yaml`.
-
-All prespecified method suites can be launched with one resumable command:
-
-```powershell
-py src\scripts\run_all_dm77_experiments.py --profile full
-```
-
-The `quick` profile runs every condition with seed 17; `full` runs the seven
-method/negative-control suites over all configured seeds; `publication` additionally
-runs the much larger rank-only and contrastive-v2 primary/stress/stability suites.
-Completed plan entries are skipped by default, and the final summary is generated
-automatically. Progress is recorded in
-`artifacts/dm77_method_ablations/master_status.json`.
-
-Level VI/protected pathways bypass discretionary ranking. Manual-review cases are not
-automatically allocated. Mandatory actions bypass causal ranking. The discretionary
-allocator applies an explicit selected action to `current_care_state`; it does not
-construct a final package as `1 + sum(selected increments)`.
-
-## Preserved numeric-transition experiments
-
-The previous `1_to_2`, ..., `5_to_6` fully synthetic path remains available only when
-its configuration explicitly declares `opportunity_source: synthetic_legacy`:
-
-```powershell
-py src\scripts\run_prometheus.py --config configs\prometheus\global_smoke.yaml
-```
-
-The older local-transition baseline is also preserved:
-
-```powershell
-py src\scripts\run_prometheus.py --legacy-local --config configs\prometheus\smoke.yaml
-causal-ranking run-legacy-local --config configs\prometheus\smoke.yaml
-```
-
-Legacy experiment suites and summaries use the scripts under `src/scripts/` and keep
-their original method version and numeric-transition semantics.
+All stochastic components require explicit registered seeds. Synthetic truth,
+potential outcomes and latent response are written only under `evaluation_only/`
+after learner-safe data, causal supervision, validation pairs, the fitted ranker,
+priority scores, selected validation calibrator and actionable recommendations have
+been frozen and checksummed. Synthetic truth is opened only after the allocation
+policy and allocation decisions have also been frozen.
 
 ## Scope
 
-All integrated results are methodological results from actual seeded runs. Synthetic
-potential outcomes, `true_cate`, latent effects, and individual effects are physically
-separated and joined only for post-allocation evaluation. They never enter nuisance fitting, pair construction,
-ranker training, calibration, or observational allocation.
-
-The DM 77 thresholds and care-action rules in this repository are transparent research
-operationalizations, not official executable national rules. The project does not
-claim clinical effectiveness, validity for the Italian population, superiority over
-ACG, or deployment readiness. See
-`docs/dm77_action_integration.md`, `docs/dm77_implementation.md`, and
-`docs/synthetic_population_protocol.md` for the contracts and limitations. The
-evidence hierarchy, target-trial requirements, external-validation modes, and
-prospective path are specified in `docs/prometheus_validation_roadmap.md`.
+The current evidence is fully synthetic and methodological. It does not establish
+clinical effectiveness, validity for the Italian population, equivalence or
+superiority to ACG, fairness, or deployment readiness. The active scientific plan is
+in `docs/prometheus_causal_stratification_plan.md`.
