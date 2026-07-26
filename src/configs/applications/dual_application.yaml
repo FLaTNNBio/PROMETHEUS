@@ -1,0 +1,45 @@
+config_version: dual-application-v1
+dm77:
+  patients: 5000
+  patients_smoke: 1200
+  seed: 7101
+  response_scenario: partially_aligned
+  causal_supervision:
+    nuisance_seed: 7102
+    nuisance_folds: 3
+    nuisance_repeats: 3
+    propensity_clip: 0.04
+    propensity_model_max_iter: 55
+    outcome_model_max_iter: 60
+  ranking:
+    model_seed: 7103
+    hidden_width: 96
+    treatment_embedding_dim: 12
+    projection_dim: 24
+    learning_rate: 0.0003
+    weight_decay: 0.0005
+    epochs: 55
+    patience: 8
+    batch_size: 256
+    maximum_contrastive_pairs: 5000
+    contrastive_batch_size: 256
+    contrastive_positive_quantile: 0.2
+    contrastive_negative_quantile: 0.8
+    contrastive_weight: 0.05
+    contrastive_margin: 1.0
+    contrastive_warmup_epochs: 1
+    dropout: 0.12
+    minimum_contrastive_epochs: 2
+  pairs:
+    maximum_train_pairs: 25000
+    maximum_validation_pairs: 8000
+    minimum_gap: 0.2
+    train_seed: 7104
+    validation_seed: 7105
+  allocation:
+    capacity_fraction_monitoring: 0.18
+    capacity_fraction_home_care: 0.1
+    capacity_fraction_case_management: 0.06
+    budget_multiplier: 0.85
+ems:
+  config_path: configs/applications/ems_case_study.yaml

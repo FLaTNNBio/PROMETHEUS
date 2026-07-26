@@ -1,0 +1,173 @@
+config_version: asl-real-x-contrastive-pretrained-baselines-v2
+scientific_contract:
+  source_population: pseudonymized_asl_benevento_baseline_2025
+  covariates_are_real: true
+  treatment_assignment_is_simulated: true
+  potential_outcomes_are_simulated: true
+  clinical_effectiveness_claims_allowed: false
+  oracle_inputs_allowed_for_training: false
+asl_semisynthetic:
+  patients: 30000
+  patients_smoke: 6000
+  minimum_age: 18
+  seed: 8101
+  response_scenario: partially_aligned
+  baselines:
+    seed: 8201
+    max_iter: 80
+    max_iter_smoke: 35
+    r_learner_folds: 3
+    r_learner_propensity_clip: 0.05
+  causal_supervision:
+    nuisance_seed: 8102
+    nuisance_fit_mode: full_bootstrap
+    nuisance_repeats: 3
+    minimum_nuisance_arm_count: 20
+    propensity_clip: 0.04
+    propensity_model_max_iter: 65
+    outcome_model_max_iter: 70
+  ranking:
+    model_seed: 8103
+    hidden_width: 96
+    treatment_embedding_dim: 16
+    projection_dim: 24
+    learning_rate: 0.0003
+    weight_decay: 0.0005
+    epochs: 60
+    patience: 12
+    batch_size: 256
+    maximum_contrastive_pairs: 5000
+    contrastive_batch_size: 256
+    contrastive_positive_quantile: 0.2
+    contrastive_negative_quantile: 0.8
+    contrastive_weight: 0.05
+    contrastive_margin: 1.0
+    contrastive_warmup_epochs: 1
+    dropout: 0.12
+    minimum_contrastive_epochs: 2
+    pair_type_loss_multipliers:
+      within_unit: 1.75
+      within_treatment: 1.0
+      global_cross_treatment: 1.0
+    calibration:
+      enabled: true
+      weight: 0.1
+      batch_size: 256
+      huber_beta: 1.0
+      minimum_reliability_weight: 0.25
+      warmup_epochs: 0
+    within_unit_auxiliary:
+      enabled: true
+      weight: 0.15
+      maximum_pairs: 12000
+      minimum_signal_difference: 0.05
+      minimum_repeat_agreement: 0.6
+      gap_clip_quantile: 0.95
+      batch_size: 256
+      warmup_epochs: 0
+    legacy_triplet:
+      enabled: false
+      maximum_triplets: 6000
+      quantile_bins: 10
+      positive_band_distance: 1
+      negative_band_distance: 4
+      minimum_repeat_agreement: 0.75
+      positive_repeat_distance_quantile: 0.5
+      weight: 0.0
+      margin: 0.5
+      batch_size: 256
+    causal_contrastive:
+      enabled: true
+      mode: uncertainty_aware_ordinal_triplet
+      weight: 0.0005
+      margin: 0.15
+      neutral_effect_quantile: 0.2
+      minimum_neutral_threshold: 0.05
+      positive_radius_quantile: 0.2
+      minimum_positive_radius: 0.05
+      negative_radius_quantile: 0.7
+      minimum_negative_radius: 0.25
+      uncertainty_filtering: true
+      uncertainty_weighting: true
+      uncertainty_max_quantile: 0.6
+      reliability_floor: 0.1
+      maximum_anchors: 12000
+      anchor_batch_size: 96
+      batch_size: 256
+      same_patient_hard_negatives: false
+      same_patient_negative_probability: 0.0
+      require_same_patient_negatives: false
+      hard_negative_effect_gap: 0.5
+      warmup_epochs: 3
+      ramp_epochs: 5
+      minimum_active_epochs: 3
+      minimum_post_ramp_epochs: 2
+      strict_diagnostics: true
+      temperature: 0.1
+      hard_negative_weight: 0.25
+    validation_selection:
+      ndcg_fraction: 0.25
+      topk_value_fractions:
+      - 0.1
+      - 0.25
+      - 0.5
+      weights:
+        global_concordance: 0.2
+        cross_treatment_concordance: 0.25
+        within_unit_concordance: 0.3
+        ndcg: 0.15
+        topk_dr_value: 0.1
+    minimum_training_epochs: 20
+    contrastive_pretraining:
+      enabled: true
+      mode: uncertainty_aware_ordinal_triplet
+      epochs: 30
+      patience: 8
+      learning_rate: 0.001
+      weight_decay: 0.0005
+      margin: 0.15
+      neutral_effect_quantile: 0.2
+      minimum_neutral_threshold: 0.05
+      positive_radius_quantile: 0.2
+      minimum_positive_radius: 0.05
+      negative_radius_quantile: 0.7
+      minimum_negative_radius: 0.25
+      uncertainty_filtering: true
+      uncertainty_weighting: true
+      uncertainty_max_quantile: 0.6
+      reliability_floor: 0.1
+      maximum_anchors: 12000
+      anchor_batch_size: 128
+      maximum_validation_anchors: 4000
+      maximum_validation_triplets: 6000
+      same_patient_hard_negatives: false
+      same_patient_negative_probability: 0.0
+      strict_diagnostics: true
+      validation_weights:
+        triplet_accuracy: 0.4
+        separation: 0.3
+        effect_distance_correlation: 0.3
+    ranking_finetuning:
+      freeze_encoder_epochs: 3
+      freeze_encoder_entire_finetuning: false
+      encoder_learning_rate: 0.0001
+      head_learning_rate: 0.0005
+  pairs:
+    maximum_train_pairs: 30000
+    maximum_validation_pairs: 9000
+    minimum_gap: 0.15
+    train_seed: 8104
+    validation_seed: 8105
+    minimum_repeat_agreement: 0.7
+    pair_type_fractions:
+      within_unit: 0.5
+      within_treatment: 0.2
+      global_cross_treatment: 0.3
+    top_region_fraction: 0.25
+    top_pair_multiplier: 2.0
+    gap_clip_quantile: 0.95
+  allocation:
+    capacity_fraction_monitoring: 0.18
+    capacity_fraction_home_care: 0.1
+    capacity_fraction_case_management: 0.06
+    budget_multiplier: 0.85

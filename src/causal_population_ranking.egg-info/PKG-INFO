@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: causal-population-ranking
+Version: 0.3.0
+Summary: Direct causal ranking of patient-care-profile opportunities
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: pandas
+Requires-Dist: scipy
+Requires-Dist: scikit-learn
+Requires-Dist: torch
+Requires-Dist: PyYAML
+Provides-Extra: report
+Requires-Dist: matplotlib<4,>=3.8; extra == "report"
+Provides-Extra: test
+Requires-Dist: pytest<10,>=8; extra == "test"
+Requires-Dist: matplotlib<4,>=3.8; extra == "test"

@@ -1,0 +1,105 @@
+# Aggregate-only Phase-10 protocol. It accepts frozen predictions and independent
+# references after governance approval; nothing here may feed training or selection.
+# A software smoke run cannot authorize an external or clinical claim.
+protocol:
+  version: prometheus_phase10_external_validation_v1
+  frozen_on: 2026-07-21
+  status: awaiting_authorized_external_data_and_independent_clinical_adjudication
+  pipeline_contract_path: pipeline.yaml
+  scientific_contract_version: prometheus_profile_stratification_v2
+  baseline_need_contract_version: prometheus_baseline_need_stratifier_v1
+  primary_output: baseline_need_level
+  causal_policy_outputs_in_scope: false
+  output_policy: aggregate_only
+
+governance:
+  authorized_external_classification: authorized_external_clinical
+  smoke_classification: synthetic_smoke_only
+  required_external_attestations:
+    - cohort_use_authorized
+    - clinical_reference_use_authorized
+    - independent_adjudication_confirmed
+    - prediction_frozen_before_reference_release_confirmed
+    - post_index_data_excluded_confirmed
+    - aggregate_export_only
+  required_acg_attestations:
+    - acg_use_authorized
+    - acg_same_cohort_confirmed
+    - acg_same_index_date_confirmed
+  external_claims_allowed_by_software_run: false
+
+inputs:
+  prediction_required_columns:
+    - patient_id
+    - index_date
+    - baseline_need_level
+    - prediction_frozen_at
+    - baseline_need_model_version
+  clinical_reference_required_columns:
+    - patient_id
+    - index_date
+    - clinical_reference_level
+    - reference_data_cutoff
+    - adjudicated_at
+    - reference_released_at
+    - adjudication_panel_version
+    - adjudication_independent_of_prometheus
+  feature_provenance_required_columns:
+    - patient_id
+    - index_date
+    - feature_name
+    - latest_source_time
+  acg_required_columns:
+    - patient_id
+    - index_date
+    - acg_risk_group
+    - acg_data_cutoff
+    - acg_mapping_version
+
+preindex_contract:
+  timestamp_rule: latest_source_time_strictly_before_index_date
+  required_feature_names:
+    - age
+    - condition_distinct
+    - prior_inpatient
+    - prior_emergency
+    - medication_distinct
+    - frailty_index
+    - functional_limitation_score
+    - social_fragility_score
+    - cognitive_impairment
+    - non_self_sufficiency
+    - caregiver_available
+    - housing_instability
+    - palliative_need
+
+evaluation:
+  levels: [1, 2, 3, 4, 5, 6]
+  clinical_reference_field: clinical_reference_level
+  acg_field: acg_risk_group
+  subgroup_columns: [female, rurality, caregiver_available, site_id, calendar_period]
+  minimum_subgroup_size: 30
+  minimum_reportable_cell_size: 10
+  primary_metrics:
+    - quadratic_weighted_kappa
+    - macro_f1
+    - balanced_accuracy
+    - ordinal_mae
+    - within_one_level_accuracy
+    - spearman
+    - confusion_matrix
+  acg_comparison_role: descriptive_ordinal_agreement_not_accuracy_or_superiority
+  missing_prediction_policy: retain_in_denominator_and_report_coverage
+  uncertainty:
+    method: patient_level_percentile_bootstrap
+    samples: 1000
+    confidence_level: 0.95
+    clinical_reference_seed: 8101
+    acg_agreement_seed: 8111
+
+claims:
+  clinical_effectiveness: forbidden
+  italian_population_validity: forbidden_until_authorized_external_results_reviewed
+  acg_equivalence_or_superiority: forbidden
+  causal_actionability_validation: not_part_of_baseline_need_agreement_protocol
+  deployment_readiness: forbidden

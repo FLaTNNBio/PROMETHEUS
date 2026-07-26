@@ -25,3 +25,5 @@ artifacts/runs/*/*.pt
 /.agents/
 /AGENTS.md
 /CODEX.md
+/ASL/reports
+/src/reports

@@ -1,0 +1,2 @@
+[console_scripts]
+causal-ranking = causal_population_ranking.cli:main

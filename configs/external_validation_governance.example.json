@@ -1,0 +1,15 @@
+{
+  "data_classification": "authorized_external_clinical",
+  "approval_id": "REPLACE_WITH_GOVERNANCE_APPROVAL_ID",
+  "cohort_use_authorized": false,
+  "clinical_reference_use_authorized": false,
+  "independent_adjudication_confirmed": false,
+  "prediction_frozen_before_reference_release_confirmed": false,
+  "post_index_data_excluded_confirmed": false,
+  "aggregate_export_only": false,
+  "acg_use_authorized": false,
+  "acg_same_cohort_confirmed": false,
+  "acg_same_index_date_confirmed": false,
+  "acg_approval_id": "REPLACE_ONLY_IF_ACG_IS_AUTHORIZED",
+  "external_claims_allowed": false
+}

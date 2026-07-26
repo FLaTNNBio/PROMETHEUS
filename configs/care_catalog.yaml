@@ -1,3 +1,6 @@
+# Versioned synthetic research catalogue used by the pipeline. It operationalizes
+# care states, component actions and target profile bundles; it is not an official
+# DM 77 catalogue or clinical recommendation.
 catalog_version: prometheus_dm77_care_profiles_v1
 component_action_catalog_version: dm77_computable_care_actions_v1
 catalog_status: synthetic_research_operationalization_not_official_dm77

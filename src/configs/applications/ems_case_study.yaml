@@ -1,0 +1,115 @@
+config_version: ems-case-study-v2
+data:
+  directory: data_ambulanze
+reporting:
+  output_root: reports/ems_case_study
+scientific_contract:
+  source_data_level: aggregate_only
+  causal_validation_on_observed_ems_data: false
+  priority_score_is_ordinal: true
+  allocation_utility_is_separate_from_raw_priority_score: true
+  policy_benchmark_uses_common_constraints: true
+  resource_cost_units_are_simulated: true
+  ranking_and_calibration_frozen_across_constraint_regimes: true
+  individual_cate_estimated_then_sorted: false
+  potential_outcomes_are_simulated: true
+  oracle_inputs_allowed_for_training: false
+  clinical_effectiveness_claims_allowed: false
+  italian_population_claims_allowed: false
+  deployment_readiness_claims_allowed: false
+simulation:
+  missions: 23391
+  outcome_name: days_alive_outside_acute_hospital_over_30_days
+  severity_order:
+  - B
+  - V
+  - G
+  - R
+  response_scenario: partially_aligned
+  split_fractions:
+    nuisance_train: 0.3
+    rank_train: 0.25
+    validation: 0.15
+    calibration: 0.15
+    test: 0.15
+  seeds:
+    joint_demand_seed: 1001
+    severity_seed: 1002
+    event_type_seed: 1003
+    clock_seed: 1004
+    patient_feature_seed: 1005
+    system_state_seed: 1006
+    effect_seed: 1007
+    assignment_seed: 1008
+    outcome_seed: 1009
+    split_seed: 1010
+    assessment_seed: 1011
+causal_supervision:
+  nuisance_seed: 2001
+  nuisance_folds: 3
+  nuisance_repeats: 5
+  propensity_clip: 0.03
+  propensity_model_max_iter: 120
+  outcome_model_max_iter: 120
+ranking:
+  model_seed: 3001
+  pair_seed: 3002
+  validation_pair_seed: 3003
+  evaluation_pair_seed: 3004
+  hidden_width: 64
+  learning_rate: 0.0003
+  weight_decay: 0.0005
+  epochs: 80
+  patience: 12
+  batch_size: 512
+  maximum_train_pairs: 120000
+  maximum_validation_pairs: 40000
+  maximum_evaluation_pairs: 200000
+  minimum_signal_difference: 0.1
+  minimum_repeat_agreement: 0.6
+  treatment_embedding_dim: 12
+  projection_dim: 24
+  maximum_contrastive_pairs: 4000
+  contrastive_positive_quantile: 0.2
+  contrastive_negative_quantile: 0.8
+  contrastive_weight: 0.05
+  contrastive_margin: 1.0
+  contrastive_warmup_epochs: 1
+  contrastive_batch_size: 256
+  dropout: 0.12
+  minimum_contrastive_epochs: 2
+allocation:
+  nurse_or_higher_fraction: 0.25
+  medicalized_fraction: 0.05
+  tie_seed: 4001
+  severity_tie_seed: 4002
+  random_baseline_seed: 4003
+  oracle_solver_time_limit_seconds: 120
+policy_benchmark:
+  model_max_iter: 120
+  risk_model_seed: 5001
+  outcome_model_seed: 5002
+  optimizer_tie_seed: 5003
+  greedy_tie_seed: 5004
+  random_policy_seed: 5005
+  nurse_response_cost: 1.0
+  medicalized_response_cost: 3.0
+  budget_per_test_mission: 0.35
+constraint_sensitivity:
+  allocator_tie_seed: 6001
+  greedy_tie_seed: 6002
+  solver_time_limit_seconds: 120
+  budget_multipliers:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  - 1.25
+  - 1.5
+  capacity_multipliers:
+  - 0.25
+  - 0.5
+  - 0.75
+  - 1.0
+  - 1.25

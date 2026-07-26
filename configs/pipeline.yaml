@@ -1,3 +1,6 @@
+# Canonical end-to-end PROMETHEUS experiment. This is the only learning-pipeline
+# config: synthetic truth is evaluation-only and every stochastic component uses a
+# distinct seed registered near the end of this file.
 config_version: prometheus_care_profile_pipeline_v1
 decision_unit: care_profile
 opportunity_source: care_profile_catalog
@@ -5,7 +8,7 @@ opportunity_source: care_profile_catalog
 run:
   run_id: auto
   output_root: artifacts/prometheus_pipeline
-  population_size: 1800
+  population_size: 5000
   history_months: 24
   population_seed: 2101
   reference_seed: 2111
@@ -156,8 +159,8 @@ causal_supervision:
   repeat_seed_stride: 101
   split_fractions:
     nuisance_train: 0.30
-    rank_train: 0.45
-    validation: 0.125
+    rank_train: 0.325
+    validation: 0.25
     test: 0.125
   propensity_clip: [0.03, 0.97]
   overlap_support_bounds: [0.05, 0.95]
@@ -207,13 +210,21 @@ causal_supervision:
     - current_care_profile_level
   categorical_features: [current_care_profile]
 
+# Learns an ordinal patient-profile ordering directly from learner-safe DR pairs.
+# It must never estimate an individual CATE and sort the estimates.
 ranker:
+  # Evidence primary remains rank-only. The contrastive candidate below is the
+  # fixed V2.2 ordered-margin formulation and is always reported as an ablation.
   primary_variant: global_rank_only
   variants:
     - independent_profile_rankers
     - global_rank_only
     - global_rank_plus_contrastive
     - direct_pairwise_gbdt
+    - linear_pairwise_additive
+    - linear_pairwise_interactions
+    - profile_mean_dr
+    - prespecified_stratum_dr
     - risk_based_ranking
     - baseline_need_based_ranking
     - random
@@ -236,15 +247,45 @@ ranker:
   maximum_pair_weight: 5.0
   allow_cross_profile_training_pairs: true
   allow_same_patient_cross_profile_pairs: false
-  contrastive_pairs: 2048
+  allow_same_patient_contrastive_pairs: false
+  pair_sampling_backend: stratified_streaming
+  pair_sampling_maximum_attempts: 8000000
+  contrastive_pairs: 8192
   contrastive_response_bins: 4
-  contrastive_weight: 0.10
-  contrastive_margin: 1.0
+  contrastive_target_mode: ordered_triplets
+  contrastive_loss_type: ordered_cosine_triplet_margin
+  contrastive_margin: 0.20
+  contrastive_weight: 0.05
+  contrastive_weight_mode: fixed
+  contrastive_within_profile_fraction: 0.50
+  contrastive_use_reliability_weight: true
+  contrastive_minimum_order_agreement: 0.75
+  contrastive_minimum_distance_gap: 0.20
+  contrastive_max_reuse_per_opportunity: 64
+  contrastive_warmup_epochs: 4
+  contrastive_ramp_epochs: 4
+  contrastive_minimum_active_epochs: 15
+  contrastive_final_rank_only_epochs: 4
+  contrastive_pretrain_epochs: 0
+  contrastive_pretrain_only: false
+  contrastive_representation_source: projection_head
+  contrastive_geometry_source: legacy
+  contrastive_retain_inactive_projection_head: false
+  use_shared_joint_encoder: false
+  profile_conditioning: legacy_concat
+  contrastive_geometry_diagnostic_interval: 2
   gbdt_max_iter: 24
   gbdt_max_depth: 3
   gbdt_learning_rate: 0.05
   gbdt_reference_rows: 48
+  linear_pairwise_c: 1.0
+  linear_pairwise_max_iter: 500
+  profile_mean_dr_shrinkage_strength: 20.0
+  stratum_dr_columns: [baseline_need_level, current_care_profile]
+  stratum_dr_shrinkage_strength: 30.0
 
+# Converts supported ordinal scores into frozen profile recommendations. Calibration
+# is separate and never changes the meaning of raw_priority_score.
 recommendation:
   minimum_validation_rows: 30
   monotonic_bins: 8
@@ -253,7 +294,10 @@ recommendation:
   minimum_profile_validation_rows: 20
   profile_evidence_one_sided_z: 2.576
   profile_evidence_null_days: 0.0
+  profile_evidence_splits: [nuisance_train, validation]
+  profile_evidence_mode: population_pooled_nonnull_guardrail
 
+# Allocates only frozen recommendations under budget and capacity constraints.
 allocation:
   method: cardinal_milp_over_frozen_recommendations_v1
   shared_budget_units_per_patient: 0.75
@@ -265,6 +309,7 @@ allocation:
     mip_relative_gap: 0.0
     time_limit_seconds: 15.0
 
+# Non-oracle falsification and sensitivity checks; never model-selection inputs.
 diagnostics:
   campaign_version: prometheus_nonoracle_diagnostics_v1
   status: prespecified_before_discovery
@@ -297,18 +342,19 @@ diagnostics:
     minimum_unpermuted_minus_permuted_concordance: 0.00
   failure_policy: stop_before_large_experiments_and_version_diagnostic_protocol
 
+# Prespecified discovery, declaration, untouched confirmation and stability campaign.
 experiments:
-  protocol_version: prometheus_ranker_stabilization_v7
-  status: global_rank_only_locked_after_v7_discovery_before_confirmation
+  protocol_version: prometheus_ranker_stabilization_v9
+  status: phase9b_v9_complete_candidate_unchanged_after_confirmation
   scenario: baseline_identifiable
   population_size: 5000
   candidate_variants: [global_rank_only, global_rank_plus_contrastive]
   component_seed_derivation: numpy_seed_sequence_namespaced_uint32_v1
   stability_diagnostics:
-    registry_group: stability_diagnostics_v7
-    dataset_seed: 6073
-    reference_run_seed: 3503
-    perturbation_run_seeds: [3517, 3533, 3557]
+    registry_group: stability_diagnostics_v9
+    dataset_seed: 6113
+    reference_run_seed: 4201
+    perturbation_run_seeds: [4211, 4229, 4253]
     sources:
       model_initialization: [ranker_model_seed]
       pair_sampling: [ranker_pair_seed, ranker_validation_pair_seed, ranker_contrastive_seed]
@@ -345,8 +391,8 @@ experiments:
       repeats: 5
       split_fractions:
         nuisance_train: 0.30
-        rank_train: 0.45
-        validation: 0.125
+        rank_train: 0.325
+        validation: 0.25
         test: 0.125
     acceptance:
       minimum_stabilized_mean_score_spearman: 0.65
@@ -355,13 +401,17 @@ experiments:
       minimum_each_source_score_spearman: 0.50
       minimum_each_source_top_10pct_jaccard: 0.15
       minimum_each_source_top_20pct_jaccard: 0.20
+      minimum_stabilized_mean_recommended_patient_jaccard: 0.75
+      minimum_stabilized_mean_allocated_patient_jaccard: 0.50
+      minimum_each_source_recommended_patient_jaccard: 0.65
+      minimum_each_source_allocated_patient_jaccard: 0.40
     baseline_comparison_role: descriptive_only_not_an_acceptance_gate
     oracle_allowed: false
     observed_outcome_allowed_for_causal_supervision: true
     outcome_allowed_in_stability_metric: false
   discovery:
-    registry_group: stabilized_discovery
-    run_seeds: [2503, 2521, 2539, 2557, 2579]
+    registry_group: stabilized_discovery_v9
+    run_seeds: [4303, 4327, 4349, 4373, 4391]
     selection_partition: validation
     selection_metric: best_validation_pairwise_loss
     aggregate: minimum_mean
@@ -370,14 +420,14 @@ experiments:
     test_partition_allowed: false
     expected_locked_candidate: global_rank_only
   confirmation:
-    registry_group: stabilized_confirmation
-    run_seeds: [2609, 2633, 2657, 2683, 2707, 2731, 2753, 2777, 2801, 2833]
+    registry_group: stabilized_confirmation_v9
+    run_seeds: [4409, 4421, 4447, 4463, 4481, 4507, 4523, 4547, 4561, 4583]
     sealed_until_candidate_declaration_written: true
     minimum_runs: 10
   fixed_dataset_stability:
-    registry_group: stabilized_fixed_dataset
-    dataset_seed: 7001
-    run_seeds: [2851, 2879, 2903, 2927, 2953]
+    registry_group: stabilized_fixed_dataset_v9
+    dataset_seed: 7207
+    run_seeds: [4603, 4621, 4643, 4663, 4691]
     fixed_component_names: [ranker_model_seed]
     sealed_until_candidate_declaration_written: true
     acceptance:
@@ -391,12 +441,14 @@ experiments:
     stability_fractions: [0.10, 0.20]
     subgroup_columns: [female, rurality, caregiver_available]
     bootstrap_samples: 1000
-    paired_bootstrap_seed: 2971
-    registry_group: phase9b_reporting
+    paired_bootstrap_seed: 4703
+    registry_group: phase9b_reporting_v9
     confidence_level: 0.95
     oracle_solver_time_limit_seconds: 120.0
+    oracle_budget_curve_comparison: omitted_primary_budget_oracle_retained
   failure_policy: stop_without_reselecting_on_confirmation_oracle
 
+# Ordered frozen synthetic scenarios used by the canonical run.
 scenarios:
   - baseline_identifiable
   - need_current_alignment
@@ -413,6 +465,7 @@ scenarios:
   - capacity_scarcity
   - heterogeneous_profile_costs
 
+# Exit gates are frozen before the corresponding results are opened.
 gates:
   truth_tables_written_after_learner_boundary: true
   implicit_action_to_profile_conversion_allowed: false
@@ -437,10 +490,11 @@ gates:
 
 # Methodological guardrails used by the same pipeline. These are kept here so an
 # experiment is fully described by one configuration file.
+# Machine-checked scientific boundary shared by training, evaluation and reporting.
 scientific_contract:
-  contract_version: prometheus_profile_stratification_v1
+  contract_version: prometheus_profile_stratification_v2
   frozen_on: 2026-07-20
-  contract_status: phase9b_v7_candidate_locked_before_confirmation
+  contract_status: phase9b_v9_complete_after_frozen_confirmation
 
   decision_unit:
     primary: care_profile
@@ -456,7 +510,7 @@ scientific_contract:
     baseline_need_level:
       semantics: descriptive_dm77_aligned_need_independent_of_capacity_and_actionability
     recommended_actionable_level:
-      semantics: supported_profile_level_with_maximum_validation_calibrated_incremental_benefit
+      semantics: supported_profile_level_with_maximum_ranker_independent_calibrated_incremental_benefit
     allocated_care_level:
       semantics: profile_level_activated_after_operational_constraints
     must_remain_distinct: true
@@ -535,22 +589,27 @@ scientific_contract:
     rank_only_baseline: required
     contrastive_v2:
       role: auxiliary
+      canonical_loss: ordered_cosine_triplet_margin
+      canonical_margin: 0.20
+      canonical_weight: 0.05
+      canonical_weight_mode: fixed
+      canonical_backbone: legacy_direct_ranking
+      promotion_status: reported_ablation_not_primary
       separate_projection_head: required_except_explicit_ablation
       may_replace_direct_ranking_objective: false
+      pair_label_source: repeated_cross_fitted_dr_pseudo_outcome_rank_train_only
+      representation_target: causal_response_similarity_not_covariate_similarity
+      inference_output_head: ranking_head_only
+      retention_policy: nonoracle_validation_selection_then_frozen_controls
 
   calibration_contract:
-    fit_partition: validation
-    target: heldout_robust_doubly_robust_signal_days
+    fit_partitions: [nuisance_train, validation]
+    target: ranker_independent_cross_fitted_and_heldout_robust_dr_signal_days
     oracle_target_allowed: false
     candidate_methods:
       - pooled_isotonic
-      - reliability_weighted_pooled_isotonic
-      - monotonic_binned
-      - profile_mean_shrinkage
-    selector: minimum_validation_dr_mae_among_monotonic_finite_candidates
-    selector_tie_breakers:
-      - maximum_validation_rank_correlation
-      - lexicographic_method_name
+    selector: fixed_prespecified_pooled_isotonic
+    selector_tie_breakers: []
     output_field: calibrated_incremental_benefit
     raw_score_replaced: false
     recommendation_out_of_validation_score_range: abstain
@@ -571,8 +630,8 @@ scientific_contract:
       minimum_profile_effective_sample_size: 30
       require_patient_empirical_support: true
       require_score_inside_validation_calibration_range: true
-      require_profile_validation_lower_bound_above_null: true
-      profile_validation_evidence_is_individual_interval: false
+      require_population_pooled_evidence_lower_bound_above_null: true
+      population_pooled_evidence_is_individual_interval: false
     tie_breakers:
       - maximum_raw_priority_score
       - lexicographic_care_profile_id
@@ -742,10 +801,11 @@ scientific_contract:
 
 # Seed governance is embedded to keep every stochastic choice auditable without a
 # second registry file.
+# Consumed seeds are provenance records; they must not be silently recycled.
 seed_registry:
-  registry_version: prometheus_profile_stratification_seed_registry_v1
+  registry_version: prometheus_profile_stratification_seed_registry_v2
   frozen_on: 2026-07-20
-  scientific_contract: prometheus_profile_stratification_v1
+  scientific_contract: prometheus_profile_stratification_v2
 
   policy:
     explicit_seed_required: true
@@ -827,21 +887,65 @@ seed_registry:
       dataset_seeds: [6073]
       run_seeds: [3503, 3517, 3533, 3557]
 
+    stability_diagnostics_v8:
+      status: consumed_for_phase9b_v8_rank_and_decision_stability_do_not_reuse
+      dataset_seeds: [6091]
+      run_seeds: [3607, 3613, 3631, 3659]
+
+    stability_diagnostics_v9:
+      status: consumed_for_passed_phase9b_v9_rank_and_decision_stability_do_not_reuse
+      dataset_seeds: [6113]
+      run_seeds: [4201, 4211, 4229, 4253]
+
     stabilized_discovery:
       status: consumed_for_phase9b_v7_nonoracle_candidate_selection_do_not_reuse
       run_seeds: [2503, 2521, 2539, 2557, 2579]
 
     stabilized_confirmation:
-      status: reserved_now_open_only_after_phase9b_candidate_declaration_freeze
+      status: consumed_for_failed_phase9b_v7_confirmation_do_not_reuse
       run_seeds: [2609, 2633, 2657, 2683, 2707, 2731, 2753, 2777, 2801, 2833]
 
     stabilized_fixed_dataset:
-      status: reserved_now_open_only_after_phase9b_candidate_declaration_freeze
+      status: consumed_for_failed_phase9b_v7_decision_stability_do_not_reuse
       dataset_seeds: [7001]
       run_seeds: [2851, 2879, 2903, 2927, 2953]
 
     phase9b_reporting:
-      status: reserved_unopened_for_phase9b_paired_bootstrap_uncertainty
+      status: consumed_for_failed_phase9b_v7_reporting_do_not_reuse
       run_seeds: [2971]
+
+    stabilized_discovery_v8:
+      status: consumed_for_phase9b_v8_nonoracle_candidate_selection_do_not_reuse
+      run_seeds: [3701, 3719, 3733, 3761, 3779]
+
+    stabilized_confirmation_v8:
+      status: consumed_for_failed_phase9b_v8_confirmation_do_not_reuse
+      run_seeds: [3803, 3821, 3847, 3863, 3889, 3911, 3931, 3947, 3967, 3989]
+
+    stabilized_fixed_dataset_v8:
+      status: consumed_for_failed_phase9b_v8_decision_stability_do_not_reuse
+      dataset_seeds: [7103]
+      run_seeds: [4001, 4021, 4049, 4073, 4091]
+
+    phase9b_reporting_v8:
+      status: consumed_for_failed_phase9b_v8_reporting_do_not_reuse
+      run_seeds: [4111]
+
+    stabilized_discovery_v9:
+      status: consumed_for_phase9b_v9_nonoracle_candidate_selection_do_not_reuse
+      run_seeds: [4303, 4327, 4349, 4373, 4391]
+
+    stabilized_confirmation_v9:
+      status: consumed_for_passed_phase9b_v9_confirmation_do_not_reuse
+      run_seeds: [4409, 4421, 4447, 4463, 4481, 4507, 4523, 4547, 4561, 4583]
+
+    stabilized_fixed_dataset_v9:
+      status: consumed_for_passed_phase9b_v9_fixed_dataset_stability_do_not_reuse
+      dataset_seeds: [7207]
+      run_seeds: [4603, 4621, 4643, 4663, 4691]
+
+    phase9b_reporting_v9:
+      status: consumed_for_passed_phase9b_v9_reporting_do_not_reuse
+      run_seeds: [4703]
 
   reserved: {}
